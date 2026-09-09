@@ -1,0 +1,92 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging / egg-info
+*.egg-info/
+.installed.cfg
+*.egg
+build/
+dist/
+develop-eggs/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+
+# Pytest / Coverage / Caching
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+
+# Environments & Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Local state & checkpoints
+.state/
+*.state
+checkpoint.json
+
+# Model files / weights (Whisper / faster-whisper / Hugging Face)
+models/
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+huggingface/
+.cache/huggingface/
+
+# Generated datasets, outputs, and collected transcripts
+/dataset/
+/datasets/
+/output/
+/outputs/
+/test_output/
+/data/
+**/transcripts/*.txt
+*.transcript.txt
+*.raw.txt
+*.srt
+*.vtt
+manifest.jsonl
+manifest.json
+
+# Secrets, API keys, credentials
+*.secret
+secrets.json
+api_keys.json
+token.json
+credentials.json
+.env.*
+
+# IDE / Editor specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# Temporary run directories
+tmp/
+temp/
+tf_e2e_*/

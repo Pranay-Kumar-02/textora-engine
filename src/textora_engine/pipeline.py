@@ -45,6 +45,7 @@ from textora_engine.state.checkpoint import StateManager
 from textora_engine.storage.manifest import ManifestManager
 from textora_engine.storage.writer import DatasetWriter
 from textora_engine.transcripts.coordinator import TranscriptCoordinator
+from textora_engine.video_understanding import VideoUnderstandingRegistry
 
 logger = logging.getLogger("textora_engine.pipeline")
 
@@ -81,6 +82,8 @@ class TextoraPipeline:
             export_srt=config.export_srt,
             export_vtt=config.export_vtt,
             export_json=config.export_json,
+            export_multimodal_md=config.export_multimodal_md,
+            export_multimodal_json=config.export_multimodal_json,
         )
         self.manifest_manager = ManifestManager(
             output_dir=self.output_dir,
@@ -264,6 +267,32 @@ class TextoraPipeline:
                 error_message=str(e),
             )
 
+        # 9b. Multimodal Video Understanding (optional, isolated companion output)
+        visual_frame_count = 0
+        multimodal_transcript = None
+        if self.config.multimodal:
+            try:
+                provider = VideoUnderstandingRegistry.get_provider(
+                    self.config.multimodal_provider,
+                    frame_interval_seconds=self.config.frame_interval_seconds,
+                )
+                multimodal_transcript = provider.process(
+                    source=source,
+                    segments=raw_transcript.segments,
+                    output_dir=self.output_dir,
+                    frame_interval_seconds=self.config.frame_interval_seconds,
+                )
+                if multimodal_transcript and multimodal_transcript.visual_frames:
+                    visual_frame_count = len(multimodal_transcript.visual_frames)
+                    if self.config.export_multimodal_md or self.config.export_multimodal_json:
+                        self.writer.save_multimodal(
+                            source=source,
+                            multimodal_transcript=multimodal_transcript,
+                            language_code=lang_decision.detected_language,
+                        )
+            except Exception as e:
+                logger.warning(f"Multimodal video understanding encountered error for {source.source_id}: {e}")
+
         # 10. Update Manifest & State Checkpoint
         manifest_record = ManifestRecord(
             source_id=source.source_id,
@@ -285,6 +314,10 @@ class TextoraPipeline:
             processed_at=datetime.now(timezone.utc).isoformat(),
             status=ProcessStatus.SUCCESS.value,
             notes=notes,
+            author=source.author,
+            upload_date=source.upload_date,
+            visual_frame_count=visual_frame_count,
+            multimodal_enabled=self.config.multimodal,
         )
         self.manifest_manager.add_record(manifest_record, full_text=clean_text)
         self.state_manager.mark_success(
@@ -313,6 +346,9 @@ class TextoraPipeline:
             normalized_hash=norm_hash,
             word_count=quality.word_count,
             character_count=quality.character_count,
+            duration_seconds=source.duration_seconds,
+            multimodal_transcript=multimodal_transcript,
+            visual_frame_count=visual_frame_count,
         )
 
 ForgePipeline = TextoraPipeline

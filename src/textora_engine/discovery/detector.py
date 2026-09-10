@@ -7,7 +7,7 @@ import hashlib
 import os
 import re
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from textora_engine.exceptions import SourceDiscoveryError
@@ -212,3 +212,24 @@ def discover_inputs(raw_inputs: List[str]) -> List[SourceItem]:
         raise SourceDiscoveryError(f"Unrecognized video source or path: '{item_str}'")
 
     return discovered
+
+
+def discover_from_query(
+    query: str,
+    limit: int = 10,
+    provider: Optional[Any] = None,
+) -> List[SourceItem]:
+    """
+    Discover video sources matching a search query.
+    Uses YouTubePublicSearchProvider by default.
+    """
+    if provider is None:
+        from textora_engine.discovery.search_provider import YouTubePublicSearchProvider
+        provider = YouTubePublicSearchProvider()
+
+    try:
+        return provider.search(query, limit=limit)
+    except Exception as e:
+        import logging
+        logging.getLogger("textora_engine.discovery").warning(f"Search discovery failed for query '{query}': {e}")
+        return []

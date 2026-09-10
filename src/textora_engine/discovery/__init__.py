@@ -5,6 +5,7 @@ Discovery layer for universal video sources.
 from textora_engine.discovery.detector import (
     SUPPORTED_VIDEO_EXTENSIONS,
     discover_from_path,
+    discover_from_query,
     discover_from_text_file,
     discover_inputs,
     extract_youtube_playlist_id,
@@ -21,6 +22,7 @@ __all__ = [
     "extract_youtube_video_id",
     "extract_youtube_playlist_id",
     "generate_local_file_id",
+    "discover_from_query",
     "fetch_youtube_playlist",
     "fetch_youtube_title",
 ]

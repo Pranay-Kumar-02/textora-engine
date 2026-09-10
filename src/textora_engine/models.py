@@ -77,6 +77,9 @@ class SourceItem:
     source_id: str                      # Canonical ID: e.g. 11-char YouTube ID or local file hash/id
     uri: str                            # Full URL or local path string
     title: Optional[str] = None
+    author: Optional[str] = None
+    upload_date: Optional[str] = None
+    description: Optional[str] = None
     file_path: Optional[Path] = None    # Set if available as local file
     duration_seconds: Optional[float] = None
     file_size_bytes: Optional[int] = None
@@ -102,10 +105,114 @@ class TranscriptSegment:
     start: float
     duration: float
     confidence: Optional[float] = None
+    speaker: Optional[str] = None
 
     @property
     def end(self) -> float:
         return self.start + self.duration
+
+
+@dataclass
+class VisualFrame:
+    """An extracted or sampled visual frame with timestamp and provenance."""
+    frame_id: str
+    timestamp: float
+    file_path: Optional[str] = None
+    visual_type: str = "sampled_frame"
+    description: Optional[str] = None
+    ocr_text: Optional[str] = None
+    confidence: Optional[float] = None
+    provider: str = "unknown"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "frame_id": self.frame_id,
+            "timestamp": round(self.timestamp, 3),
+            "file_path": self.file_path,
+            "visual_type": self.visual_type,
+            "description": self.description,
+            "ocr_text": self.ocr_text,
+            "confidence": round(self.confidence, 4) if self.confidence is not None else None,
+            "provider": self.provider,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "VisualFrame":
+        return cls(
+            frame_id=data.get("frame_id", ""),
+            timestamp=float(data.get("timestamp", 0.0)),
+            file_path=data.get("file_path"),
+            visual_type=data.get("visual_type", "sampled_frame"),
+            description=data.get("description"),
+            ocr_text=data.get("ocr_text"),
+            confidence=float(data["confidence"]) if data.get("confidence") is not None else None,
+            provider=data.get("provider", "unknown"),
+        )
+
+
+@dataclass
+class MultimodalSegment:
+    """A transcript segment aligned with corresponding visual frames."""
+    segment_id: str
+    start: float
+    end: float
+    text: str
+    speaker: Optional[str] = None
+    visual_frames: List[VisualFrame] = field(default_factory=list)
+
+    @property
+    def duration(self) -> float:
+        return self.end - self.start
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "segment_id": self.segment_id,
+            "start": round(self.start, 3),
+            "end": round(self.end, 3),
+            "text": self.text,
+            "speaker": self.speaker,
+            "visual_frames": [f.to_dict() for f in self.visual_frames],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MultimodalSegment":
+        frames = [VisualFrame.from_dict(f) for f in data.get("visual_frames", [])]
+        return cls(
+            segment_id=data.get("segment_id", ""),
+            start=float(data.get("start", 0.0)),
+            end=float(data.get("end", 0.0)),
+            text=data.get("text", ""),
+            speaker=data.get("speaker"),
+            visual_frames=frames,
+        )
+
+
+@dataclass
+class MultimodalTranscript:
+    """Enriched multimodal transcript containing aligned segments and visual references."""
+    source_id: str
+    segments: List[MultimodalSegment]
+    visual_frames: List[VisualFrame] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source_id": self.source_id,
+            "segments": [s.to_dict() for s in self.segments],
+            "visual_frames": [f.to_dict() for f in self.visual_frames],
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MultimodalTranscript":
+        segments = [MultimodalSegment.from_dict(s) for s in data.get("segments", [])]
+        frames = [VisualFrame.from_dict(f) for f in data.get("visual_frames", [])]
+        return cls(
+            source_id=data.get("source_id", ""),
+            segments=segments,
+            visual_frames=frames,
+            metadata=data.get("metadata", {}),
+        )
 
 
 @dataclass
@@ -162,6 +269,8 @@ class ProcessResult:
     word_count: int = 0
     character_count: int = 0
     duration_seconds: float = 0.0
+    multimodal_transcript: Optional[MultimodalTranscript] = None
+    visual_frame_count: int = 0
 
 
 @dataclass
@@ -173,19 +282,23 @@ class ManifestRecord:
     title: str
     output_path: str
     transcript_source: str
-    stt_backend: Optional[str]
-    stt_model: Optional[str]
-    language: str
-    quality_status: str
-    word_count: int
-    character_count: int
-    duration_seconds: Optional[float]
-    transcript_hash: str
-    normalized_hash: str
-    confidence: float
-    processed_at: str
+    stt_backend: Optional[str] = None
+    stt_model: Optional[str] = None
+    language: str = "auto"
+    quality_status: str = "UNKNOWN"
+    word_count: int = 0
+    character_count: int = 0
+    duration_seconds: Optional[float] = None
+    transcript_hash: str = ""
+    normalized_hash: str = ""
+    confidence: float = 0.0
+    processed_at: str = ""
     status: str = "SUCCESS"
     notes: Optional[str] = None
+    visual_frame_count: int = 0
+    multimodal_enabled: bool = False
+    author: Optional[str] = None
+    upload_date: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -205,10 +318,14 @@ class ManifestRecord:
             "duration_seconds": self.duration_seconds,
             "transcript_hash": self.transcript_hash,
             "normalized_hash": self.normalized_hash,
-            "confidence": round(self.confidence, 4),
+            "confidence": round(self.confidence, 4) if self.confidence is not None else 0.0,
             "processed_at": self.processed_at,
             "status": self.status,
             "notes": self.notes,
+            "visual_frame_count": self.visual_frame_count,
+            "multimodal_enabled": self.multimodal_enabled,
+            "author": self.author,
+            "upload_date": self.upload_date,
         }
 
     @classmethod

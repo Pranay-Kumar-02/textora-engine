@@ -10,8 +10,14 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from textora_engine.exceptions import StorageError
-from textora_engine.models import RawTranscript, SourceItem, SourceType
-from textora_engine.storage.formatter import export_as_json, export_as_srt, export_as_vtt
+from textora_engine.models import MultimodalTranscript, RawTranscript, SourceItem, SourceType
+from textora_engine.storage.formatter import (
+    export_as_json,
+    export_as_multimodal_json,
+    export_as_multimodal_markdown,
+    export_as_srt,
+    export_as_vtt,
+)
 
 
 def sanitize_filename(name: str) -> str:
@@ -56,12 +62,16 @@ class DatasetWriter:
         export_srt: bool = False,
         export_vtt: bool = False,
         export_json: bool = False,
+        export_multimodal_md: bool = False,
+        export_multimodal_json: bool = False,
     ):
         self.output_dir = output_dir
         self.group_by = group_by
         self.export_srt = export_srt
         self.export_vtt = export_vtt
         self.export_json = export_json
+        self.export_multimodal_md = export_multimodal_md
+        self.export_multimodal_json = export_multimodal_json
 
     def resolve_output_directory(self, source: SourceItem, language: str) -> Path:
         """Resolve the target directory based on grouping policy."""
@@ -144,3 +154,30 @@ class DatasetWriter:
             atomic_write_text(json_path, export_as_json(raw_transcript, normalized_text, meta))
 
         return target_txt
+
+    def save_multimodal(
+        self,
+        source: SourceItem,
+        multimodal_transcript: MultimodalTranscript,
+        language_code: str,
+    ) -> Dict[str, Path]:
+        """
+        Write optional multimodal companion files (.multimodal.md, .multimodal.json).
+        Does NOT touch or modify the pure .txt transcript.
+        """
+        paths: Dict[str, Path] = {}
+        target_base = self.resolve_target_filepath(source, language_code, extension=".txt")
+
+        if self.export_multimodal_md:
+            md_path = target_base.with_name(f"{target_base.stem}.multimodal.md")
+            content_md = export_as_multimodal_markdown(multimodal_transcript, source)
+            atomic_write_text(md_path, content_md)
+            paths["md"] = md_path
+
+        if self.export_multimodal_json:
+            json_path = target_base.with_name(f"{target_base.stem}.multimodal.json")
+            content_json = export_as_multimodal_json(multimodal_transcript, source)
+            atomic_write_text(json_path, content_json)
+            paths["json"] = json_path
+
+        return paths

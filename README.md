@@ -18,7 +18,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue?style=flat-square&logo=python" alt="Python Versions">
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/Tests-34%20passed-brightgreen?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-57%20passed-brightgreen?style=flat-square" alt="Tests">
   <img src="https://img.shields.io/badge/CLI-Typer%20%26%20Rich-purple?style=flat-square" alt="CLI">
   <img src="https://img.shields.io/badge/STT-Faster--Whisper-orange?style=flat-square" alt="STT">
 </p>
@@ -342,6 +342,51 @@ Display summary metrics for an existing dataset directory:
 textora-engine stats ./dataset
 ```
 
+### 10. Search Query Discovery
+Discover and extract videos matching a search query directly from the CLI:
+
+```bash
+textora-engine extract --query "machine learning lecture" --output ./ml_dataset
+```
+
+### 11. Multimodal Video Understanding & Synchronized Frame Extraction
+Extract interval-sampled video frames and generate synchronized multimodal Markdown and JSON companion files:
+
+```bash
+textora-engine extract ./workshop.mp4 --output ./dataset --multimodal --frame-interval 10.0 --export-multimodal-md --export-multimodal-json
+```
+
+- Primary transcript: `./dataset/transcripts/workshop.txt` (100% pure spoken text).
+- Multimodal Markdown: `./dataset/transcripts/workshop.multimodal.md` (interleaved frame embeds with timestamps).
+- Multimodal JSON: `./dataset/transcripts/workshop.multimodal.json` (machine-readable structured schema).
+- Sampled Frames: `./dataset/frames/workshop/frame_0001.jpg`, etc.
+
+### 12. Dataset Health Scorecard
+Run an executive health audit that verifies on-disk transcripts, checksums, and multimodal visual frames:
+
+```bash
+textora-engine health ./dataset
+```
+
+### 13. Generate Standalone HTML Dashboard
+Generate a self-contained, interactive HTML dashboard with zero external CDN dependencies:
+
+```bash
+textora-engine report ./dataset
+# Open ./dataset/report.html in any browser
+```
+
+### 14. Configuration Profiles
+Run with preset operational profiles:
+
+```bash
+# Fast: tiny STT model, 15s frame intervals, optimized for quick screening
+textora-engine extract --file videos.txt --profile fast
+
+# High-Quality: medium STT model, 5s frame intervals, dense text checks
+textora-engine extract --file videos.txt --profile high-quality
+```
+
 ---
 
 ## Complete CLI Options Reference
@@ -355,6 +400,9 @@ Arguments:
 Options:
   -f, --file PATH                 Input file with URLs or paths, one per line.
   -p, --playlist TEXT             YouTube playlist URL to crawl and process.
+  -s, --query TEXT                Search query to discover relevant YouTube videos.
+  -c, --config PATH               Path to TOML configuration file.
+  --profile TEXT                  Configuration profile: 'fast', 'balanced', 'high-quality'.
   -o, --output PATH               Target dataset output directory [default: ./output].
   -l, --language TEXT             Language code filter ('auto', 'en', 'es', etc.) [default: auto].
   --transcript-source TEXT        Acquisition strategy: 'auto', 'captions', 'stt' [default: auto].
@@ -373,6 +421,11 @@ Options:
   --export-json                   Export companion JSON files with timestamp segments.
   --export-jsonl PATH             Stream all processed records to a single JSONL file.
   --export-csv / --no-csv         Generate manifest.csv alongside manifest.jsonl [default: True].
+  --multimodal                    Enable multimodal video frame extraction.
+  --multimodal-provider TEXT      Video understanding provider ('local', 'null') [default: local].
+  --frame-interval FLOAT          Frame extraction interval in seconds [default: 10.0].
+  --export-multimodal-md          Export synchronized Markdown (.multimodal.md).
+  --export-multimodal-json        Export structured JSON (.multimodal.json).
   -v, --verbose                   Enable verbose debug logging.
   -q, --quiet                     Suppress non-error terminal output.
   --help                          Show help message and exit.

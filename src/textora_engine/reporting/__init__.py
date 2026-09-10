@@ -10,6 +10,7 @@ from textora_engine.reporting.console import (
     log_success,
     render_summary_table,
 )
+from textora_engine.reporting.dashboard import generate_html_report
 from textora_engine.reporting.summary import RunSummary
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "log_failure",
     "render_summary_table",
     "RunSummary",
+    "generate_html_report",
 ]

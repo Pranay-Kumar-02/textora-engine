@@ -44,3 +44,31 @@ class BaseSTTProvider(ABC):
     def get_metadata(self) -> Dict[str, Any]:
         """Return engine metadata for manifest logging."""
         pass
+
+
+class STTProviderRegistry:
+    """
+    Registry for pluggable speech-to-text providers.
+    """
+    _registry: Dict[str, Any] = {}
+
+    @classmethod
+    def register(cls, name: str):
+        def decorator(provider_cls):
+            cls._registry[name.lower()] = provider_cls
+            return provider_cls
+        return decorator
+
+    @classmethod
+    def get(cls, name: str, **kwargs: Any) -> BaseSTTProvider:
+        key = name.lower()
+        if key not in cls._registry:
+            available = ", ".join(cls._registry.keys()) or "none"
+            raise ValueError(
+                f"Unknown STT backend '{name}'. Available registered backends: {available}"
+            )
+        return cls._registry[key](**kwargs)
+
+    @classmethod
+    def list_available(cls) -> List[str]:
+        return sorted(list(cls._registry.keys()))

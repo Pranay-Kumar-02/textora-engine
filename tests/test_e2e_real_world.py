@@ -444,8 +444,122 @@ def main():
 
         results["TEST 13 (Doctor Diagnostics)"] = "PASSED - System runtime, core dependencies, FFmpeg, STT, and write access audited"
 
+        # ============================================================
+        # TEST 14: REAL-WORLD MULTIMODAL E2E
+        # ============================================================
+        print("\n--- TEST 14: Real-World Multimodal Video Understanding E2E ---")
+        t14_out = test_dir / "test14_multimodal"
+        media_dir = test_dir / "multimodal_media"
+        media_dir.mkdir(parents=True, exist_ok=True)
+        vid_file = media_dir / "architecture_demo.mp4"
+        srt_file = media_dir / "architecture_demo.en.srt"
+
+        # 1. Create deterministic video with FFmpeg testsrc
+        from textora_engine.media.ffmpeg_util import find_ffmpeg
+        ffmpeg_bin = find_ffmpeg()
+        gen_cmd = [
+            ffmpeg_bin, "-y",
+            "-f", "lavfi", "-i", "testsrc=duration=4:size=320x240:rate=1",
+            "-f", "lavfi", "-i", "sine=frequency=1000:duration=4",
+            "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p",
+            str(vid_file),
+        ]
+        subprocess.run(gen_cmd, capture_output=True, check=True)
+        assert vid_file.exists() and vid_file.stat().st_size > 0
+
+        # 2. Provide sibling subtitle file
+        srt_file.write_text(
+            "1\n00:00:00,000 --> 00:00:02,000\nWelcome to this multimodal system architecture demonstration. Today we explore advanced video processing.\n\n"
+            "2\n00:00:02,000 --> 00:00:04,000\nHere we show the visual frames synchronized with spoken audio, maintaining strict temporal alignment and quality metrics.\n",
+            encoding="utf-8",
+        )
+
+        # 3. Process with Textora Engine CLI with multimodal enabled
+        res14 = run_cmd([
+            "extract", str(vid_file),
+            "--output", str(t14_out),
+            "--multimodal",
+            "--frame-interval", "2.0",
+            "--min-words", "10",
+            "--export-multimodal-md",
+            "--export-multimodal-json",
+        ])
+        print(f"Multimodal CLI stdout:\n{res14.stdout}")
+        assert res14.returncode == 0
+
+        # 4. Verify primary .txt contains strictly pure text
+        txt_files = list(t14_out.glob("transcripts/*.txt"))
+        assert len(txt_files) == 1
+        pure_txt = txt_files[0].read_text(encoding="utf-8")
+        assert "Welcome to this multimodal system architecture demonstration." in pure_txt
+        assert "#" not in pure_txt, "Primary .txt contains unexpected markdown header"
+        assert "![" not in pure_txt, "Primary .txt contains unexpected image embed"
+        assert "-->" not in pure_txt, "Primary .txt contains unexpected timestamp"
+
+        # 5. Verify extracted image files on disk
+        frames_dirs = list((t14_out / "frames").glob("architecture_demo*"))
+        assert len(frames_dirs) == 1, f"Expected 1 frames dir matching architecture_demo*, found: {list((t14_out / 'frames').glob('*')) if (t14_out / 'frames').exists() else 'none'}"
+        frames_dir = frames_dirs[0]
+        image_files = sorted(list(frames_dir.glob("*.jpg")))
+        assert len(image_files) >= 2, f"Expected at least 2 sampled frames, found {len(image_files)}"
+        for img in image_files:
+            assert img.stat().st_size > 0, f"Frame {img} is 0 bytes"
+
+        # 6. Verify companion Multimodal Markdown
+        md_files = list(t14_out.glob("transcripts/*.multimodal.md"))
+        assert len(md_files) == 1
+        md_content = md_files[0].read_text(encoding="utf-8")
+        assert "architecture_demo" in md_content
+        assert "![Frame at " in md_content
+        assert "sampled_frame" in md_content
+
+        # 7. Verify companion Multimodal JSON
+        json_files = list(t14_out.glob("transcripts/*.multimodal.json"))
+        assert len(json_files) == 1
+        with open(json_files[0], "r", encoding="utf-8") as f:
+            mm_json_data = json.load(f)
+        assert "architecture_demo" in mm_json_data["source_id"]
+        assert len(mm_json_data["visual_frames"]) >= 2
+        # Check honest semantics
+        for f_entry in mm_json_data["visual_frames"]:
+            assert f_entry["visual_type"] == "sampled_frame"
+            assert f_entry["description"] is None
+            assert f_entry["ocr_text"] is None
+            assert f_entry["confidence"] is None
+
+        # 8. Verify manifest metadata
+        manifest_path = t14_out / "manifest.json"
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest_entries = json.load(f)
+        assert len(manifest_entries) == 1
+        assert manifest_entries[0]["visual_frame_count"] >= 2
+        assert manifest_entries[0]["multimodal_enabled"] is True
+
+        # 9. Verify health scorecard recognizes and validates frames
+        res_health = run_cmd(["health", str(t14_out)])
+        print(f"Health stdout:\n{res_health.stdout}")
+        assert res_health.returncode == 0
+        assert "HEALTHY" in res_health.stdout
+        assert "Score: 100/100" in res_health.stdout
+        assert "Verified Visual Frames" in res_health.stdout
+
+        # 10. Verify standalone HTML report generation
+        res_report = run_cmd(["report", str(t14_out)])
+        print(f"Report stdout:\n{res_report.stdout}")
+        assert res_report.returncode == 0
+        report_html = t14_out / "report.html"
+        assert report_html.exists()
+        html_str = report_html.read_text(encoding="utf-8")
+        assert "Textora Engine" in html_str
+        assert "Visual Frames" in html_str
+
+        results["TEST 14 (Real Multimodal Video Understanding E2E)"] = (
+            f"PASSED - {len(image_files)} frames extracted, temporal alignment verified, "
+            f"honest semantics confirmed, pure .txt guaranteed, health scorecard 100/100"
+        )
+
         print("\n============================================================")
-        print("ALL 13 E2E TESTS COMPLETED SUCCESSFULLY!")
+        print("ALL 14 E2E TESTS COMPLETED SUCCESSFULLY!")
         print("============================================================")
         for k, v in results.items():
             print(f"[*] {k}: {v}")

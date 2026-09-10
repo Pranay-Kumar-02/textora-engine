@@ -403,6 +403,88 @@ def doctor_cmd(
     console.print(table)
 
 
+@app.command(name="repair", help="Safely audit and reconstruct corrupted or missing manifest.json without data loss.")
+def repair_cmd(
+    output_dir: Path = typer.Argument(Path("./output"), help="Path to output dataset directory."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Simulate repair without modifying manifest."),
+):
+    if not output_dir.exists():
+        console.print(f"[bold red]Directory does not exist:[/bold red] {output_dir}")
+        raise typer.Exit(code=1)
+
+    from textora_engine.dataset import DatasetRepairer
+    report = DatasetRepairer.repair(output_dir, dry_run=dry_run)
+    console.print(f"[bold green]Dataset Repair Status:[/bold green] {report['status']}")
+    console.print(f"  Files audited: [cyan]{report['total_files_audited']}[/cyan]")
+    console.print(f"  Newly indexed: [green]{len(report['newly_indexed_files'])}[/green]")
+    console.print(f"  Updated hashes: [yellow]{len(report['updated_hash_files'])}[/yellow]")
+    console.print(f"  Total manifest records: [bold]{report['total_manifest_records']}[/bold]")
+
+
+@app.command(name="version", help="Manage immutable dataset releases and snapshot manifests.")
+def version_cmd(
+    action: str = typer.Argument(..., help="Action: 'create' or 'list'."),
+    version_tag: Optional[str] = typer.Option(None, "--tag", "-t", help="Version tag (e.g. v1.0)."),
+    name: str = typer.Option("default", "--name", "-n", help="Dataset name."),
+    output_dir: Path = typer.Option(Path("./output"), "--output", "-o", help="Dataset output directory."),
+):
+    from textora_engine.dataset import DatasetVersionManager
+    mgr = DatasetVersionManager()
+    if action == "create":
+        if not version_tag:
+            console.print("[bold red]--tag is required to create a dataset version[/bold red]")
+            raise typer.Exit(code=1)
+        try:
+            ver = mgr.create_version(output_dir, version_tag=version_tag, dataset_name=name)
+            console.print(f"[bold green]Created immutable dataset version:[/bold green] {ver.version_tag} ({ver.total_sources} sources, {ver.total_words} words)")
+        except Exception as e:
+            console.print(f"[bold red]Failed to create version:[/bold red] {e}")
+            raise typer.Exit(code=1)
+    elif action == "list":
+        versions = mgr.list_versions(output_dir)
+        if not versions:
+            console.print(f"[yellow]No versions found in {output_dir}/versions/[/yellow]")
+            return
+        table = Table(title=f"Dataset Versions: {output_dir}", border_style="cyan")
+        table.add_column("Tag", style="bold white")
+        table.add_column("Sources", justify="right")
+        table.add_column("Words", justify="right")
+        table.add_column("Created At", style="dim")
+        for v in versions:
+            table.add_row(v.get("version_tag", ""), str(v.get("total_sources", "")), str(v.get("total_words", "")), str(v.get("created_at", "")))
+        console.print(table)
+    else:
+        console.print(f"[bold red]Unknown version action:[/bold red] {action}. Use 'create' or 'list'.")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="serve", help="Launch Textora Engine HTTP REST API server.")
+def serve_cmd(
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host interface to bind."),
+    port: int = typer.Option(8000, "--port", "-p", help="Port number."),
+    output_dir: Path = typer.Option(Path("./output"), "--output", "-o", help="Root output directory."),
+    db_path: Optional[Path] = typer.Option(None, "--db-path", help="Path to SQLite platform database."),
+):
+    import uvicorn
+    from textora_engine.db import SQLiteDatabase, MigrationRunner
+    from textora_engine.jobs.queue import SQLiteDurableJobQueue
+    from textora_engine.storage.backend import LocalStorageBackend
+    from textora_engine.api.app import create_app
+
+    resolved_output = output_dir.resolve()
+    resolved_db = (db_path or (resolved_output / ".platform" / "textora.db")).resolve()
+    db = SQLiteDatabase(resolved_db)
+    MigrationRunner(db).run_pending_migrations()
+    queue = SQLiteDurableJobQueue(db)
+    storage = LocalStorageBackend(resolved_output)
+
+    api_app = create_app(db=db, queue=queue, storage=storage)
+    console.print(f"[bold green]Starting Textora Engine API[/bold green] on [cyan]http://{host}:{port}[/cyan]")
+    console.print(f"  Database: {resolved_db}")
+    console.print(f"  Storage:  {resolved_output}")
+    uvicorn.run(api_app, host=host, port=port)
+
+
 def main():
     app()
 

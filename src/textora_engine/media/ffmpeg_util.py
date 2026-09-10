@@ -53,22 +53,9 @@ def find_ffmpeg() -> str:
 
 def run_ffmpeg_command(args: list[str], timeout: Optional[int] = None) -> subprocess.CompletedProcess:
     """
-    Run an FFmpeg command with the discovered binary.
+    Run an FFmpeg command with the discovered binary using SubprocessRunner.
     """
+    from textora_engine.security.subprocess import SubprocessRunner
     ffmpeg_exe = find_ffmpeg()
     cmd = [ffmpeg_exe] + args
-    logger.debug(f"Running ffmpeg command: {' '.join(cmd)}")
-    try:
-        proc = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-            check=True,
-        )
-        return proc
-    except subprocess.CalledProcessError as e:
-        err_msg = e.stderr[-500:] if e.stderr else str(e)
-        logger.error(f"FFmpeg command failed: {err_msg}")
-        raise
+    return SubprocessRunner.run_safe(cmd, timeout=timeout, check=True)

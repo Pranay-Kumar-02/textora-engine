@@ -2,6 +2,11 @@
 Storage and manifest package for Textora Engine.
 """
 
+from textora_engine.storage.backend import (
+    LocalStorageBackend,
+    StorageBackend,
+    StorageMetadata,
+)
 from textora_engine.storage.formatter import (
     export_as_json,
     export_as_srt,
@@ -15,6 +20,9 @@ from textora_engine.storage.writer import (
 )
 
 __all__ = [
+    "StorageBackend",
+    "LocalStorageBackend",
+    "StorageMetadata",
     "DatasetWriter",
     "ManifestManager",
     "atomic_write_text",

@@ -68,7 +68,7 @@ def main():
         res1 = run_cmd(["extract", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "--output", str(t1_out), "--language", "en"])
         print(f"CLI Return code: {res1.returncode}")
         print(f"CLI stdout:\n{res1.stdout}")
-        
+
         txt_files = list(t1_out.glob("transcripts/*.txt"))
         manifest_file = t1_out / "manifest.json"
         state_file = t1_out / ".state" / "processed.json"
@@ -121,7 +121,7 @@ def main():
         playlist_url = "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab"
         res3 = run_cmd(["preview", playlist_url])
         print(f"Playlist Preview:\n{res3.stdout[:400]}")
-        assert res3.returncode == 0
+        assert res3.returncode == 0, f"res3 failed (code {res3.returncode}): {res3.stderr}"
         assert "Discovered Sources" in res3.stdout
         assert "YOUTUBE" in res3.stdout
 
@@ -221,8 +221,8 @@ def main():
             transcript_source=TranscriptSource.MANUAL_CAPTIONS,
             language_code="hi",
             is_generated=False,
-            segments=[TranscriptSegment(text="नमस्ते दोस्तों आज हम डेटाबेस के बारे में सीखेंगे", start=0.0, duration=4.0)],
-            raw_text="नमस्ते दोस्तों आज हम डेटाबेस के बारे में सीखेंगे",
+            segments=[TranscriptSegment(text="à¤¨à¤®à¤¸à¥à¤¤à¥‡ à¤¦à¥‹à¤¸à¥à¤¤à¥‹à¤‚ à¤†à¤œ à¤¹à¤® à¤¡à¥‡à¤Ÿà¤¾à¤¬à¥‡à¤¸ à¤•à¥‡ à¤¬à¤¾à¤°à¥‡ à¤®à¥‡à¤‚ à¤¸à¥€à¤–à¥‡à¤‚à¤—à¥‡", start=0.0, duration=4.0)],
+            raw_text="à¤¨à¤®à¤¸à¥à¤¤à¥‡ à¤¦à¥‹à¤¸à¥à¤¤à¥‹à¤‚ à¤†à¤œ à¤¹à¤® à¤¡à¥‡à¤Ÿà¤¾à¤¬à¥‡à¤¸ à¤•à¥‡ à¤¬à¤¾à¤°à¥‡ à¤®à¥‡à¤‚ à¤¸à¥€à¤–à¥‡à¤‚à¤—à¥‡",
         )
         d_hi = val.validate(t_hi)
         assert d_hi.is_acceptable is False, "Hindi should be rejected under English target"
@@ -375,7 +375,7 @@ def main():
 
         res9 = run_cmd(["extract", str(v_valid), inv_yt, str(v_valid2), "--output", str(t9_out)])
         print(f"Failure Isolation stdout:\n{res9.stdout}")
-        
+
         # Valid items succeeded
         assert (t9_out / "transcripts" / "valid_vid.txt").exists()
         assert (t9_out / "transcripts" / "valid_vid2.txt").exists()

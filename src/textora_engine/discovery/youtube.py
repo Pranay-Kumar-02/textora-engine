@@ -34,21 +34,31 @@ def fetch_youtube_title(video_id: str, timeout: int = 5) -> Optional[str]:
 
 def fetch_youtube_playlist(
     playlist_id: str,
-    timeout: int = 15,
+    timeout: int = 25,
 ) -> Tuple[Optional[str], List[SourceItem]]:
     """
     Fetch video items from a YouTube playlist ID without downloading media.
     """
+    import time
+
     url = f"https://www.youtube.com/playlist?list={urllib.parse.quote(playlist_id)}"
     req = urllib.request.Request(
         url,
         headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9"},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            html = response.read().decode("utf-8", errors="replace")
-    except Exception as e:
-        raise SourceDiscoveryError(f"Failed to retrieve playlist {playlist_id}: {e}")
+    last_err = None
+    html = ""
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                html = response.read().decode("utf-8", errors="replace")
+                break
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+    else:
+        raise SourceDiscoveryError(f"Failed to retrieve playlist {playlist_id}: {last_err}")
 
     playlist_title: Optional[str] = None
     items: List[SourceItem] = []

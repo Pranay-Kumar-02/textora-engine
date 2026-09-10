@@ -61,4 +61,3 @@ def test_cli_doctor(tmp_path: Path):
     assert doc_res.exit_code == 0
     assert "System Diagnostics" in doc_res.stdout
     assert "Python Runtime" in doc_res.stdout
-

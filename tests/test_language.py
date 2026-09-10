@@ -52,8 +52,8 @@ def test_english_validation_rejects_non_latin_scripts():
         transcript_source=TranscriptSource.MANUAL_CAPTIONS,
         language_code="hi",
         is_generated=False,
-        segments=[TranscriptSegment(text="नमस्ते दोस्तों, आज हम भौतिक विज्ञान के महत्वपूर्ण नियमों को समझेंगे।", start=0.0, duration=4.0)],
-        raw_text="नमस्ते दोस्तों, आज हम भौतिक विज्ञान के महत्वपूर्ण नियमों को समझेंगे।",
+        segments=[TranscriptSegment(text="à¤¨à¤®à¤¸à¥à¤¤à¥‡ à¤¦à¥‹à¤¸à¥à¤¤à¥‹à¤‚, à¤†à¤œ à¤¹à¤® à¤­à¥Œà¤¤à¤¿à¤• à¤µà¤¿à¤œà¥à¤žà¤¾à¤¨ à¤•à¥‡ à¤®à¤¹à¤¤à¥à¤µà¤ªà¥‚à¤°à¥à¤£ à¤¨à¤¿à¤¯à¤®à¥‹à¤‚ à¤•à¥‹ à¤¸à¤®à¤à¥‡à¤‚à¤—à¥‡à¥¤", start=0.0, duration=4.0)],
+        raw_text="à¤¨à¤®à¤¸à¥à¤¤à¥‡ à¤¦à¥‹à¤¸à¥à¤¤à¥‹à¤‚, à¤†à¤œ à¤¹à¤® à¤­à¥Œà¤¤à¤¿à¤• à¤µà¤¿à¤œà¥à¤žà¤¾à¤¨ à¤•à¥‡ à¤®à¤¹à¤¤à¥à¤µà¤ªà¥‚à¤°à¥à¤£ à¤¨à¤¿à¤¯à¤®à¥‹à¤‚ à¤•à¥‹ à¤¸à¤®à¤à¥‡à¤‚à¤—à¥‡à¥¤",
     )
     decision = validator.validate(devanagari_transcript)
     assert decision.is_acceptable is False

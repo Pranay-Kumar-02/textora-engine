@@ -1,211 +1,302 @@
 # Textora Engine
 
 <p align="center">
-  <strong>Universal Video-to-Text Pipeline & Dataset Collection Tool</strong>
+  <strong>The Video-to-Text & Multimodal Dataset Engineering Platform</strong><br>
+  <em>Turn raw video sources into clean, validated, reproducible, provenance-aware AI datasets.</em>
 </p>
 
 <p align="center">
-  <a href="#key-features">Key Features</a> •
-  <a href="#pipeline-architecture">Architecture</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#cli-usage--examples">CLI Usage</a> •
-  <a href="#python-api-usage">Python API</a> •
-  <a href="#dataset-manifest--schema">Manifest & Schema</a> •
-  <a href="#testing--verification">Testing</a> •
-  <a href="#license">License</a>
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#the-big-idea">The Big Idea</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#product-capabilities">Capabilities</a> •
+  <a href="#cli-reference">CLI Reference</a> •
+  <a href="#rest-api">REST API</a> •
+  <a href="#python-sdk">Python SDK</a> •
+  <a href="#multimodal-video-understanding">Multimodal</a> •
+  <a href="#rag--ai-agent-readiness">RAG Readiness</a> •
+  <a href="#testing--verification">Verification</a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue?style=flat-square&logo=python" alt="Python Versions">
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/Tests-57%20passed-brightgreen?style=flat-square" alt="Tests">
-  <img src="https://img.shields.io/badge/CLI-Typer%20%26%20Rich-purple?style=flat-square" alt="CLI">
-  <img src="https://img.shields.io/badge/STT-Faster--Whisper-orange?style=flat-square" alt="STT">
+  <img src="https://img.shields.io/badge/Automated%20Tests-97%20Passed-brightgreen?style=flat-square" alt="Automated Tests">
+  <img src="https://img.shields.io/badge/E2E%20Scenarios-14%2F14%20Passed-brightgreen?style=flat-square" alt="E2E Scenarios">
+  <img src="https://img.shields.io/badge/Architecture-Clean%204--Layer-purple?style=flat-square" alt="Architecture">
+  <img src="https://img.shields.io/badge/Storage-Content--Addressed%20SHA--256-orange?style=flat-square" alt="Storage">
 </p>
 
 ---
 
 ## Overview
 
-**Textora Engine** is a deterministic, modular pipeline engineered to ingest video sources—YouTube videos, playlists, local media files, and batch inventories—and transform them into clean, reliable, dataset-ready plain text corpora.
+**Textora Engine** is an open-source video-data engineering platform designed to discover, ingest, transcribe, normalize, validate, enrich, version, trace, and expose video-derived datasets.
 
-Designed specifically for **LLM pretraining, fine-tuning, RAG indexing, and NLP corpus curation**, Textora Engine enforces strict linguistic validation, eliminates duplicate rolling caption flickers, categorizes quality tiers, avoids redundant compute via intelligent caption-first routing, and writes files atomically with crash-safe state resumption.
+Traditional transcription utilities treat speech-to-text as a one-off script: *give a video file, get a plain transcript*. Textora Engine approaches video from a **data systems perspective**:
 
----
+- **Video is multi-dimensional**: Spoken knowledge is tightly coupled with visual demonstrations (code, diagrams, slides, and UI workflows).
+- **Video transcripts are inherently noisy**: Rolling caption flickers, non-lexical audio annotations (`[Music]`, `[Applause]`), language drift, and transliterated Latin script (e.g., Hinglish) degrade downstream AI models.
+- **Datasets require engineering rigor**: If data is used to train language models, ground AI agents, or populate RAG vector stores, it demands **cryptographic integrity, deterministic idempotency, immutable lineage, non-destructive repair, and multi-tenant access control**.
 
-## The Problem: Why Traditional Video Scraping Breaks
-
-Building high-quality text corpora from video content poses several practical engineering challenges:
-
-1. **Caption Flicker Duplication**: Automated YouTube subtitles stream progressively, often repeating preceding words across consecutive time segments. Naive extraction produces repetitive text that can degrade language model training quality.
-2. **Audio Annotation Noise**: Non-lexical markers such as `[Music]`, `[Applause]`, `(Laughter)`, and `(inaudible)` introduce noisy tokens into text corpora.
-3. **Metadata & Header Contamination**: Generic tools often inject titles, URLs, timestamps, or markdown headers (`---`, `# Title`) into output text files, contaminating datasets where only spoken prose is expected.
-4. **Redundant Compute**: Running speech-to-text (e.g. Whisper) across hundreds of hours of video when human-curated or embedded subtitles are already present wastes hours of GPU/CPU compute.
-5. **Language Drift & Transliterated Noise**: Simple scrapers frequently fail to detect when subtitles are non-target scripts or Latin-script transliterated text (e.g., Hinglish) rather than standard English.
-6. **Process Interruptions**: Network timeouts or corrupt media files during large batches can cause unhandled failures or leave partially written, corrupted files on disk.
+Textora Engine bridges this gap by wrapping robust media extraction and local Speech-to-Text (`faster-whisper`) inside a production-grade control plane, durable queue, and developer-first interfaces (**CLI, HTTP REST API, and Python SDK**).
 
 ---
 
-## The Solution: How Textora Engine Operates
+## Why Textora Exists: The Video-to-Data Problem
 
-Textora Engine addresses each failure mode through a structured, multi-stage pipeline:
+Video is the fastest-growing repository of human technical knowledge. University lectures, conference talks, coding tutorials, product demos, and executive interviews contain rich information that AI systems need.
 
-- **Caption-First Dual Engine**: Checks for manual and automatic captions (for YouTube) or sibling subtitle files (`.srt`, `.vtt` for local video). It only routes audio through local Speech-to-Text (`faster-whisper`) when captions are absent or when STT is explicitly requested.
-- **Deterministic Rule-Based Normalization**: Strips audio annotations, unescapes HTML entities, and eliminates overlapping caption flickers deterministically using regex and string rules—**without using generative models or hallucinating text**.
-- **Pure Plain Text Output**: Primary transcript `.txt` files contain **strictly spoken text**. Zero metadata headers, zero timestamps, and zero generated commentary. Structured metadata is preserved separately in companion formats and `manifest.jsonl`.
-- **Multi-Layer Language Filtering**: Enforces language boundaries, rejects non-Latin scripts in English mode, flags transliterated Hinglish via vocabulary-ratio analysis, and preserves scientific and technical terms.
-- **Content-Addressable Deduplication**: Uses fast 64-bit `xxhash` for content fingerprinting alongside SHA-256 archival verification to prevent duplicate processing.
-- **Crash-Safe Checkpointing & Resumption**: Atomic temporary writes prevent partial file corruption, while `.state/` ledgers track successes and failures for instantaneous, lossless batch resumption.
-- **Dataset Integrity Verification (`textora-engine validate`)**: Computes SHA-256 checksums of on-disk transcripts to verify that files match manifest records, detecting missing, modified, or unindexed files.
+Yet building high-quality text and multimodal corpora from video poses severe engineering hurdles:
+
+| Failure Mode in Naive Scraping | Engineering Impact | How Textora Engine Solves It |
+|:---|:---|:---|
+| **Caption Flicker Duplication** | Automated YouTube subtitles stream progressively, repeating preceding phrases across consecutive chunks. | **Deterministic De-flickering**: Eliminates overlapping n-gram word buffers using regex and string rules without generative hallucination. |
+| **Audio Tag & Entity Pollution** | HTML entities (`&amp;`, `&#39;`) and non-speech markers (`[Music]`, `(Laughter)`) contaminate pretraining data. | **Normalizer**: Unescapes entities and scrubs sound effect tags while preserving meaningful spoken punctuation. |
+| **Metadata Header Contamination** | Tools frequently inject titles, timestamps, or markdown headers (`# Title`, `---`) directly into `.txt` outputs. | **Pure `.txt` Invariant**: Spoken text is isolated 100% cleanly in `.txt`. Metadata is preserved separately in companion formats and manifests. |
+| **Redundant STT Compute** | Running Whisper across hundreds of hours of video when human captions already exist wastes days of GPU/CPU time. | **Caption-First Dual Engine**: Automatically checks for manual and automatic captions before falling back to local STT. |
+| **Language Drift & Transliteration** | Scraping tools fail to catch when English audio contains non-Latin scripts or transliterated Hinglish. | **Multi-Layer Language Gate**: Evaluates script boundaries and vocabulary ratios, flagging transliterated text while protecting technical jargon. |
+| **Silent Job Crashes** | Network interruptions or corrupt media files leave zero-byte files, orphaned staging directories, and duplicate records. | **Durable Worker Leasing**: Atomic staging, `os.replace` promotion, heartbeat leases, and automatic crash recovery. |
+| **Lost Provenance** | RAG retrieval chunks become untraceable; developers cannot verify which video segment or timestamp produced an answer. | **Lineage DAGs & Execution Manifests**: Every output links back to source URIs, config hashes, and pipeline versions. |
 
 ---
 
-## Pipeline Architecture
+## The Big Idea: A Data Engineering Layer for Video
+
+```
+A Standard Transcription Script:
+Input Video  ───►  Speech-to-Text  ───►  Disposable Text File
+
+The Textora Engine Platform:
+Video Source
+    │
+    ▼
+[ Source Discovery ] ──────────► YouTube Canonicalization, Playlists, Local Files
+    │
+    ▼
+[ Dual Ingestion ] ────────────► Caption-First Routing with Faster-Whisper Fallback
+    │
+    ▼
+[ Normalization ] ─────────────► De-flicker, Entity Unescape, Audio Tag Removal
+    │
+    ▼
+[ Linguistic & Quality Gates ] ─► Script Validation, Vocabulary Ratio, N-gram Loops
+    │
+    ▼
+[ Deduplication ] ─────────────► 64-bit xxHash & SHA-256 Fingerprinting
+    │
+    ▼
+[ Multimodal Extraction ] ─────► Interval-Sampled Frames & Temporal Alignment
+    │
+    ▼
+[ Artifact Promotion ] ────────► Atomic Staged Writes & Cryptographic Hashing
+    │
+    ▼
+[ Lineage & Manifests ] ───────► Immutable DAG Events & Execution Manifests
+    │
+    ▼
+[ Dataset Versioning ] ────────► Snapshot Releases (v1.0.0) & Non-Destructive Repair
+    │
+    ▼
+[ Platform Consumption ] ──────► CLI • REST API • Python SDK • RAG Retrieval Chunks
+```
+
+---
+
+## Why Textora? Core Differentiators
+
+### 1. Dataset-First Architecture
+Outputs are not treated as disposable scratch files. Every processed video produces a managed dataset artifact registered with size, xxHash64, SHA-256 digests, and strict storage schemas.
+
+### 2. Reliability by Design
+- **Durable Job Queue**: Backed by SQLite in WAL mode with worker leasing, heartbeats, and priority scheduling (`CRITICAL`, `HIGH`, `NORMAL`, `BATCH`).
+- **Crash Recovery**: Stale leases from terminated workers are automatically reclaimed (`recover_expired_leases`).
+- **Resource Governance**: `ResourceLimiter` enforces bounded concurrency slots for FFmpeg and STT, checks free disk space, and prevents OOM panics.
+
+### 3. Bit-for-Bit Reproducibility
+- **Canonical Configuration Hashing**: Normalizes configuration into key-sorted JSON (omitting volatile flags like verbosity) to generate deterministic SHA-256 config hashes.
+- **Idempotent Deduplication**: Submitting the same video with identical configuration returns the existing job without repeating expensive compute.
+
+### 4. Immutable Data Lineage
+- **Lineage DAGs**: `LineageTracker` logs structured execution events across every stage (`DISCOVERY`, `INGESTION`, `NORMALIZATION`, `QUALITY`, `PROMOTION`).
+- **Execution Manifests**: Stored in `_manifests/<execution_id>.json`, capturing environment metadata, provider details, and input/output hashes.
+
+### 5. Snapshot Dataset Versioning
+- `DatasetVersionManager` snapshots directory states into immutable releases (e.g., `v1.0.0`). Historical dataset versions remain bit-for-bit identical regardless of future additions.
+
+### 6. Honest Multimodal Video Understanding
+- Associates spoken segments with visual frames via timestamp containment.
+- **Strict Honesty Guarantee**: Local frame extraction only claims what it actually computes (`sampled_frame`). It **never** fabricates semantic labels (`code_screen`, `slide`, `ui_demo`), OCR text, or synthetic confidence scores unless a verified vision provider generates them.
+
+### 7. Security-in-Depth
+- **SSRF Protection**: `URLValidator` blocks private IPv4/IPv6 ranges, link-local, loopback, cloud metadata endpoints (169.254.169.254), sensitive non-HTTP ports, and embedded URL credentials with redirect hop inspection.
+- **Subprocess Isolation**: `SubprocessRunner` runs all FFmpeg processes with `shell=False`, argument list validation, execution timeouts, and complete process-tree termination.
+- **Storage Protection**: Path traversal detection and Windows reserved-name (`CON`, `PRN`, `AUX`) sanitization.
+- **Auth & Multi-Tenancy**: High-entropy API keys (`tx_live_...`) stored as salted SHA-256 hashes, constant-time verification (`hmac.compare_digest`), RBAC (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`), and tenant boundary enforcement.
+
+### 8. Native RAG Readiness
+- `TextoraChunker` splits transcripts into temporally bounded `RetrievalChunk` objects retaining chunk IDs, source URIs, dataset version, timestamps, visual frame paths, and SHA-256 provenance hashes.
+
+---
+
+## Product Capabilities Matrix
+
+| Capability Area | What Textora Engine Delivers | Why It Matters for Production |
+|:---|:---|:---|
+| **Source Discovery** | Canonical YouTube video & playlist parsing, local directory traversal, and batch inventory files. | Eliminates custom URL crawling scripts; handles varied video inputs through a single pipeline. |
+| **Caption Extraction** | Sibling subtitle discovery (`.srt`, `.vtt`) for local video; YouTube manual and auto-generated tracks. | Avoids redundant STT computation, saving hours of GPU time and thousands in cloud compute. |
+| **Speech-to-Text** | Local `faster-whisper` integration with selectable models (`tiny`, `base`, `small`, `medium`). | High-speed, private, offline transcription when native subtitles are unavailable. |
+| **Text Normalization** | Entity unescaping, bracketed audio marker removal, and caption de-flickering. | Generates clean prose suitable for LLM pretraining without corrupting original speech. |
+| **Linguistic Validation** | Language filtering, Latin script enforcement, and Hinglish vocabulary-ratio analysis. | Prevents silent corpus contamination from mismatched languages and transliterated scripts. |
+| **Quality Evaluation** | Automated classification into `GOOD`, `SHORT`, `SUSPICIOUS` (n-gram looping), and `EMPTY`. | Isolates corrupted or low-information videos before they enter production training sets. |
+| **Deduplication** | Content fingerprinting using 64-bit `xxhash` and SHA-256 verification. | Detects duplicate content across varying filenames or re-uploaded video files. |
+| **Multimodal Alignment** | Timestamp-bounded frame extraction with companion `.multimodal.md` and `.multimodal.json`. | Equips multimodal AI agents with visual evidence linked directly to spoken words. |
+| **Artifact Management** | Staged writes to `_staging/` with atomic promotion and zero-byte file rejection. | Ensures corrupt or partial files are never exposed to consumers or indexed into datasets. |
+| **Durable Job Queue** | SQLite WAL queue with heartbeat leases, priority scheduling, and crash reclamation. | Enables reliable background job processing and prevents duplicate concurrent execution. |
+| **Multi-Tenancy & RBAC** | Organization $\rightarrow$ Project hierarchy with API key validation and resource authorization. | Prevents cross-tenant data leaks in shared infrastructure and multi-team environments. |
+| **Dataset Versioning** | Snapshot release creation (`v1.0.0`) and manifest archiving. | Guarantees machine learning experiment reproducibility and auditability over time. |
+| **Non-Destructive Repair** | Recalculates disk checksums, indexes unindexed files, and reconstructs damaged manifests. | Recovers dataset metadata after system crashes without ever overwriting transcript text. |
+| **RAG Retrieval Chunker** | Temporally bounded text chunking with aggregated frame paths and provenance hashes. | Provides structured, citation-ready payloads for vector databases and AI agents. |
+| **Observability** | Structured JSON logs, request IDs, worker IDs, and in-memory metrics registry. | Provides operational transparency, latency tracking, and queue depth monitoring. |
+
+---
+
+## Architecture
+
+Textora Engine is structured into four cleanly separated architectural layers:
 
 ```mermaid
 flowchart TD
-    A[Input Sources\nYouTube URLs / Playlists / Local Videos / Batch Files] --> B[Universal Detector\nCanonicalize IDs & Filter Supported Formats]
-    
-    B --> C{Transcript Coordinator}
-    
-    C -- Sibling Subtitle or YouTube Track Available --> D[Caption Extractor\nManual Track Priority]
-    C -- No Subtitles Available --> E[Audio Extraction & Local STT\nFFmpeg 16kHz PCM -> Faster-Whisper]
-    
-    D --> F[Safe Normalizer\nUnescape HTML / Remove Audio Tags / De-flicker]
-    E --> F
-    
-    F --> G{Linguistic Validator}
-    G -- Language Mismatch or Hinglish --> H1[Record State: LANGUAGE_MISMATCH]
-    G -- Valid Target Language --> I{Quality Evaluator}
-    
-    I -- Empty or Sub-threshold --> H2[Record State: SHORT / EMPTY]
-    I -- Looping or Excessive Repetition --> H3[Flag: SUSPICIOUS]
-    I -- Natural Text Density --> J[Deduplication Engine\nxxHash64 & SHA-256]
-    
-    J -- Duplicate Detected --> H4[Record State: SKIPPED]
-    J -- Unique Content --> K[Atomic Storage & Manifest]
-    
-    K --> L1[Pure Transcript .txt\nZero headers, pure text]
-    K --> L2[Companion Subtitles\nOptional .srt / .vtt alongside .txt]
-    K --> L3[Structured Metadata\nOptional .json alongside .txt]
-    K --> L4[Manifest Ledger\nmanifest.jsonl & manifest.csv]
-    K --> L5[State Checkpoint\n.state/processed.json]
+    subgraph CLIENTS ["Platform Interfaces"]
+        CLI["Typer CLI\n(textora-engine)"]
+        SDK["Python SDK\n(TextoraClient)"]
+        API["FastAPI REST Server\n(/v1/...)"]
+    end
+
+    subgraph CONTROL ["Control Plane"]
+        AUTH["Auth & RBAC\n(APIKeyManager, TenantAuthorizer)"]
+        IDEMP["Idempotency Engine\n(Canonical Config Hashing)"]
+        DB[(Platform Database\nSQLite WAL + Migrations)]
+        QUEUE["Durable Job Queue\n(Worker Leasing & Heartbeats)"]
+    end
+
+    subgraph DATA ["Data Plane (Job Workers)"]
+        WORKER["Background Worker Pool"]
+        LIMITER["Resource Limiter\n(Concurrency & Disk Bounds)"]
+        STAGING["Artifact Staging\n(_staging/ & Atomic Promotion)"]
+    end
+
+    subgraph CORE ["Textora Core Engine"]
+        DISC["Source Discovery\n(YouTube / Local Files)"]
+        COORD{"Transcript Coordinator"}
+        CAPTIONS["Caption Extractor\n(Local SRT / YouTube Tracks)"]
+        STT["Faster-Whisper STT\n(16kHz PCM Pipeline)"]
+        NORM["Normalizer\n(De-flicker & Tag Scrubbing)"]
+        LANG["Linguistic Gate\n(Script & Hinglish Check)"]
+        QUAL["Quality Evaluator\n(N-gram Loop Detection)"]
+        VISION["Multimodal Provider\n(Frame Extraction & Alignment)"]
+    end
+
+    subgraph STORAGE ["Storage & Lineage"]
+        ARTIFACTS["Data Artifacts\n(.txt, .srt, .vtt, .json)"]
+        LINEAGE["Lineage Tracker\n(DAG Event Log)"]
+        MANIFESTS["Execution Manifests\n(_manifests/<id>.json)"]
+        VERSIONS["Dataset Versions\n(versions/v1.0.0)"]
+        RAG["RAG Chunks\n(RetrievalChunk)"]
+    end
+
+    CLI --> CONTROL
+    SDK --> API
+    API --> AUTH
+    AUTH --> IDEMP
+    IDEMP --> DB
+    IDEMP --> QUEUE
+    QUEUE --> WORKER
+    WORKER --> LIMITER
+    LIMITER --> CORE
+
+    DISC --> COORD
+    COORD -- Subtitles Present --> CAPTIONS
+    COORD -- Audio Only --> STT
+    CAPTIONS --> NORM
+    STT --> NORM
+    NORM --> LANG
+    LANG --> QUAL
+    QUAL --> VISION
+    VISION --> STAGING
+
+    STAGING --> ARTIFACTS
+    STAGING --> LINEAGE
+    STAGING --> MANIFESTS
+    ARTIFACTS --> VERSIONS
+    ARTIFACTS --> RAG
+```
+
+### Layer Responsibilities
+1. **Platform Interfaces**: CLI for local developers and terminal workflows; REST API for microservice architectures; Python SDK for programmatic pipeline orchestration.
+2. **Control Plane**: Manages tenant isolation, project boundaries, API keys, idempotent job submission, and durable queue scheduling.
+3. **Data Plane**: Governs worker lifecycles, sandboxed subprocesses, execution limits, temporary staging isolation, and atomic promotions.
+4. **Core Engine**: Pure content processing domain without HTTP or framework coupling—handles media extraction, STT, normalization, quality evaluation, and frame extraction.
+
+---
+
+## End-to-End Data Flow
+
+Every video processed through Textora Engine executes through a verifiable 16-stage pipeline:
+
+```
+ 1. Source Discovery      ──► Canonicalize YouTube IDs, playlist items, or local file paths.
+ 2. SSRF & Security Check ──► Validate IP targets, reject private ranges and malicious URLs.
+ 3. Config Hashing        ──► Generate deterministic configuration fingerprint.
+ 4. Idempotency Check     ──► Return existing completed job if identical request was processed.
+ 5. Durable Queue Enqueue ──► Register job in state QUEUED with priority ordering.
+ 6. Worker Claim & Lease  ──► Worker claims job atomically, establishing heartbeat lease.
+ 7. Ingestion Routing     ──► Extract sibling subtitles if present; route to STT otherwise.
+ 8. Normalization         ──► Strip HTML entities, remove sound tags, and eliminate caption flickers.
+ 9. Linguistic Validation ──► Enforce target language and reject transliterated Hinglish.
+10. Quality Evaluation    ──► Detect repetition loops, empty transcripts, and minimum length.
+11. Content Fingerprint   ──► Calculate 64-bit xxHash and SHA-256 content digest.
+12. Multimodal Sampling   ──► Extract visual frames at specified intervals via FFmpeg.
+13. Temporal Alignment    ──► Correlate frames to transcript segments by timestamp.
+14. Atomic Staging        ──► Write artifacts to _staging/<job_id>_<attempt_id> with fsync.
+15. Atomic Promotion      ──► Promote files to permanent storage; verify file hashes and size > 0.
+16. Lineage & Manifest    ──► Record execution manifest, update dataset manifest, acknowledge job.
 ```
 
 ---
 
-## Project Structure
-
-```text
-TextoraEngine/
-├── src/
-│   └── textora_engine/
-│       ├── __init__.py               # Package metadata and version info
-│       ├── __main__.py               # python -m textora_engine entry point
-│       ├── cli.py                    # Typer & Rich CLI subcommands
-│       ├── config.py                 # TextoraConfig definition & TOML parser
-│       ├── exceptions.py             # Structured error hierarchy
-│       ├── models.py                 # Core domain models & dataclasses
-│       ├── pipeline.py               # Central execution pipeline orchestrator
-│       ├── dedup/
-│       │   ├── __init__.py
-│       │   └── fingerprint.py        # xxHash64, SHA-256, and DedupRegistry
-│       ├── discovery/
-│       │   ├── __init__.py
-│       │   ├── detector.py           # Universal input resolver (URLs, dirs, files)
-│       │   └── youtube.py            # YouTube playlist crawler & metadata
-│       ├── language/
-│       │   ├── __init__.py
-│       │   └── validator.py          # Script detection, Hinglish filter, langdetect
-│       ├── media/
-│       │   ├── __init__.py
-│       │   ├── extractor.py          # FFmpeg audio conversion to 16kHz mono WAV
-│       │   └── ffmpeg_util.py        # System and bundled FFmpeg discovery
-│       ├── normalization/
-│       │   ├── __init__.py
-│       │   └── cleaner.py            # Entity unescaping, de-flickering, tag removal
-│       ├── quality/
-│       │   ├── __init__.py
-│       │   └── evaluator.py          # Quality tier classification & n-gram loops
-│       ├── reporting/
-│       │   ├── __init__.py
-│       │   ├── console.py            # Rich terminal tables, status, and summary
-│       │   └── summary.py            # Aggregate run statistics and stats.json
-│       ├── state/
-│       │   ├── __init__.py
-│       │   └── checkpoint.py         # Crash-safe checkpointing (.state/ ledger)
-│       ├── storage/
-│       │   ├── __init__.py
-│       │   ├── formatter.py          # SRT and WebVTT subtitle formatting
-│       │   ├── manifest.py           # Thread-safe manifest.jsonl & CSV logging
-│       │   └── writer.py             # Atomic file writes & pure .txt formatting
-│       ├── stt/
-│       │   ├── __init__.py
-│       │   ├── base.py               # BaseSTTProvider interface
-│       │   ├── faster_whisper_provider.py  # Local faster-whisper implementation
-│       │   └── mock_provider.py      # Deterministic mock STT for testing
-│       ├── transcripts/
-│       │   ├── __init__.py
-│       │   ├── coordinator.py        # Caption vs. STT dual-engine router
-│       │   ├── local_captions.py     # Local SRT/VTT file discovery & parser
-│       │   └── youtube_captions.py   # youtube-transcript-api integration
-│       └── validation/
-│           ├── __init__.py
-│           └── dataset_scanner.py    # Offline dataset validator & hash auditor
-├── tests/
-│   ├── conftest.py                   # Pytest fixtures and mock setups
-│   ├── test_cli.py                   # CLI subcommand invocation tests
-│   ├── test_coordinator_stt.py       # Dual-engine fallback & routing tests
-│   ├── test_dedup.py                 # Fingerprinting & duplicate registry tests
-│   ├── test_discovery.py             # URL canonicalization & batch file tests
-│   ├── test_e2e_real_world.py        # 13-scenario end-to-end real validation suite
-│   ├── test_language.py              # Script, Hinglish, & technical vocab tests
-│   ├── test_normalization.py         # Entity, tag removal, & de-flicker tests
-│   ├── test_quality.py               # Tiering (GOOD, SHORT, SUSPICIOUS, EMPTY)
-│   └── test_storage_state.py         # Atomic persistence, resume, & manifest tests
-├── .gitignore                        # Comprehensive exclusions (caches, state, output)
-├── LICENSE                           # MIT License
-├── pyproject.toml                    # PEP 621 packaging metadata & CLI entry points
-└── README.md
-```
-
----
-
-## Installation
+## Quick Start
 
 ### Requirements
 - **Python**: `3.10` or higher
-- **FFmpeg**: Required only for local video audio extraction. If FFmpeg is not installed on your system `PATH`, install `imageio-ffmpeg` via `pip install imageio-ffmpeg` or use the `[stt]` extra below.
+- **FFmpeg**: Required for local media audio extraction and frame sampling. *(Available via system package manager or bundled via `imageio-ffmpeg`)*.
 
-### 1. Basic Installation (Captions, YouTube, & Dataset Tools)
-Clone the repository and install in editable mode:
+### 1. Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/Pranay-Kumar-02/textora-engine.git
 cd textora-engine
+
+# Standard installation (CLI, YouTube ingestion, and validation tools)
 pip install -e .
-```
 
-### 2. Full Installation (Local Speech-to-Text with Faster-Whisper)
-To enable local audio transcription for videos lacking captions:
-
-```bash
+# Full installation (Local Speech-to-Text with Faster-Whisper + FFmpeg)
 pip install -e ".[stt]"
+
+# Platform installation (REST API server + SDK + dev tools)
+pip install -e ".[server,dev,stt]"
 ```
 
-### 3. Development Installation (Including Pytest)
-```bash
-pip install -e ".[dev,stt]"
-```
+### 2. Verify System Readiness
 
-### 4. Verify System Readiness
-Run the built-in system diagnostics tool to audit your runtime, dependencies, FFmpeg availability, and write permissions:
+Run the built-in diagnostic tool to audit your Python runtime, dependencies, FFmpeg installation, and disk write permissions:
 
 ```bash
 textora-engine doctor
 ```
 
-Output example:
+Example Output:
 ```text
                        Textora Engine System Diagnostics                       
 +-----------------------------------------------------------------------------+
@@ -217,439 +308,481 @@ Output example:
 | Dependency: youtube_api   | OK              | YouTube transcript engine     |
 | Dependency: langdetect    | OK              | Deterministic language filter |
 | Dependency: xxhash        | OK              | Fast 64-bit content hashing   |
-| Media: FFmpeg             | FOUND           | Available on PATH / imageio   |
+| Media: FFmpeg             | FOUND           | Available on system PATH      |
 | STT: faster-whisper       | AVAILABLE       | Local Whisper engine ready    |
+| Video Understanding       | READY           | Registered: local, null       |
 | Filesystem Access         | WRITABLE        | Read/write access confirmed   |
 +-----------------------------------------------------------------------------+
 ```
 
 ---
 
-## CLI Usage & Examples
+## CLI Reference
 
-You can run Textora Engine using either the installed command line alias:
-```bash
-textora-engine <command> [options]
-# or: textora <command> [options]
-```
-or via the Python module syntax:
-```bash
-python -m textora_engine <command> [options]
-```
-
-### 1. Preview Sources Before Processing
-Preview discovered sources without downloading transcripts or executing STT:
+Textora Engine exposes 11 CLI commands under `textora-engine` (or the alias `textora`).
 
 ```bash
-textora-engine preview https://www.youtube.com/watch?v=dQw4w9WgXcQ
+textora-engine [COMMAND] [OPTIONS]
 ```
 
-Preview an entire YouTube playlist:
-```bash
-textora-engine preview --playlist "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab"
-```
+| Command | Purpose | Primary Options | Example |
+|:---|:---|:---|:---|
+| `extract` | Ingest and process videos into clean dataset files. | `-o`, `-l`, `--stt-model`, `--multimodal`, `--export-srt` | `textora-engine extract https://youtu.be/dQw4w9WgXcQ -o ./data` |
+| `preview` | Inspect discovered sources without downloading or transcribing. | `-f`, `-p`, `-s`, `--json` | `textora-engine preview -p "https://youtube.com/playlist?list=..."` |
+| `validate` | Perform cryptographic disk checksum audit against `manifest.json`. | *(Target directory argument)* | `textora-engine validate ./data` |
+| `health` | Run an executive dataset health check and render a scorecard. | *(Target directory argument)* | `textora-engine health ./data` |
+| `report` | Generate a self-contained, interactive HTML audit dashboard. | `--output-file` | `textora-engine report ./data` |
+| `stats` | Display aggregate metrics (words, chars, durations, frames). | *(Target directory argument)* | `textora-engine stats ./data` |
+| `retry` | Target and re-process previously failed items in `.state/failed.json`. | `--config`, `--profile`, `-v` | `textora-engine retry ./data` |
+| `doctor` | Inspect runtime environment, FFmpeg, Whisper, and permissions. | *(None)* | `textora-engine doctor` |
+| `repair` | Non-destructively rebuild missing manifests and unindexed files. | *(Target directory argument)* | `textora-engine repair ./data` |
+| `version` | Create or list immutable dataset release snapshots. | `action` (`create`/`list`), `--version-tag` | `textora-engine version create ./data --version-tag v1.0.0` |
+| `serve` | Launch the Textora Engine HTTP REST API server. | `--host`, `--port`, `--output`, `--db-path` | `textora-engine serve --port 8000` |
 
-### 2. Single Video Extraction
-Extract transcript from a YouTube video to a target dataset folder:
-
-```bash
-textora-engine extract https://www.youtube.com/watch?v=dQw4w9WgXcQ --output ./my_dataset
-```
-
-Extract from a local video file (automatically detects sibling subtitles like `.srt` if present):
-```bash
-textora-engine extract ./raw_lecture.mp4 --output ./my_dataset
-```
-
-### 3. Batch Extraction from File
-Process a batch list of URLs or file paths (one per line, blank lines and `#` comments ignored):
+### Key CLI Examples
 
 ```bash
-textora-engine extract --file sources.txt --output ./my_dataset
-```
+# 1. Extract from YouTube with companion subtitle and JSON formats
+textora-engine extract https://www.youtube.com/watch?v=dQw4w9WgXcQ \
+  --output ./my_dataset --export-srt --export-vtt --export-json
 
-Example `sources.txt`:
-```text
-# Machine learning lectures
-https://www.youtube.com/watch?v=dQw4w9WgXcQ
-./recordings/lecture_01.mp4 # Sibling lecture_01.en.srt used if available
-./recordings/interview.mkv  # Falls back to local Whisper STT if no subtitles
-```
+# 2. Extract from a batch inventory file using configuration profiles
+textora-engine extract --file sources.txt --output ./my_dataset --profile high-quality
 
-### 4. YouTube Playlist Extraction
-Crawl and extract an entire public playlist with individual failure isolation:
+# 3. Multimodal extraction with 10-second interval frame sampling
+textora-engine extract ./lecture.mp4 --output ./multimodal_data \
+  --multimodal --frame-interval 10.0 --export-multimodal-md --export-multimodal-json
 
-```bash
-textora-engine extract --playlist "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab" --output ./linear_algebra
-```
+# 4. Audit dataset integrity and render HTML dashboard
+textora-engine validate ./my_dataset
+textora-engine report ./my_dataset
 
-### 5. Multi-format Exports (Subtitles & JSON Metadata)
-Export companion `.srt`, `.vtt`, and `.json` metadata alongside pure `.txt` files:
+# 5. Snapshot dataset into an immutable release
+textora-engine version create ./my_dataset --version-tag v1.0.0 --message "Initial release"
 
-```bash
-textora-engine extract ./talk.mp4 --output ./output --export-srt --export-vtt --export-json --export-csv
-```
-
-### 6. Streaming Dataset Export (`.jsonl`)
-Stream processed items directly to a unified JSONL dataset file (ideal for pretraining data ingestion):
-
-```bash
-textora-engine extract --file video_list.txt --output ./dataset --export-jsonl ./dataset/train_corpus.jsonl
-```
-
-### 7. Resume Interrupted Batches
-If a large batch is interrupted, rerun the exact same command. Textora Engine checks `.state/processed.json` and skips completed items instantaneously:
-
-```bash
-textora-engine extract --file large_list.txt --output ./dataset --resume
-```
-
-To re-run only items that failed previously:
-```bash
-textora-engine retry ./dataset
-# or: textora-engine extract --file large_list.txt --output ./dataset --retry-failed
-```
-
-### 8. Validate Dataset Integrity
-Perform a checksum disk audit of the output directory against `manifest.jsonl`:
-
-```bash
-textora-engine validate ./dataset
-```
-
-Output example:
-```text
-       Dataset Integrity Audit: ./dataset       
-+-------------------------------------+---------+
-| Audit Check                         |  Result |
-|-------------------------------------+---------|
-| Overall Health                      | HEALTHY |
-| Manifest Records                    |      16 |
-| Verified Files on Disk              |      16 |
-| Missing Files                       |       0 |
-| Corrupt / Empty Files               |       0 |
-| Hash Mismatches                     |       0 |
-| Unindexed Files                     |       0 |
-| Total Verified Words                |  28,450 |
-| Total Verified Characters           | 164,120 |
-+-------------------------------------+---------+
-```
-
-### 9. View Dataset Statistics
-Display summary metrics for an existing dataset directory:
-
-```bash
-textora-engine stats ./dataset
-```
-
-### 10. Search Query Discovery
-Discover and extract videos matching a search query directly from the CLI:
-
-```bash
-textora-engine extract --query "machine learning lecture" --output ./ml_dataset
-```
-
-### 11. Multimodal Video Understanding & Synchronized Frame Extraction
-Extract interval-sampled video frames and generate synchronized multimodal Markdown and JSON companion files:
-
-```bash
-textora-engine extract ./workshop.mp4 --output ./dataset --multimodal --frame-interval 10.0 --export-multimodal-md --export-multimodal-json
-```
-
-- Primary transcript: `./dataset/transcripts/workshop.txt` (100% pure spoken text).
-- Multimodal Markdown: `./dataset/transcripts/workshop.multimodal.md` (interleaved frame embeds with timestamps).
-- Multimodal JSON: `./dataset/transcripts/workshop.multimodal.json` (machine-readable structured schema).
-- Sampled Frames: `./dataset/frames/workshop/frame_0001.jpg`, etc.
-
-### 12. Dataset Health Scorecard
-Run an executive health audit that verifies on-disk transcripts, checksums, and multimodal visual frames:
-
-```bash
-textora-engine health ./dataset
-```
-
-### 13. Generate Standalone HTML Dashboard
-Generate a self-contained, interactive HTML dashboard with zero external CDN dependencies:
-
-```bash
-textora-engine report ./dataset
-# Open ./dataset/report.html in any browser
-```
-
-### 14. Configuration Profiles
-Run with preset operational profiles:
-
-```bash
-# Fast: tiny STT model, 15s frame intervals, optimized for quick screening
-textora-engine extract --file videos.txt --profile fast
-
-# High-Quality: medium STT model, 5s frame intervals, dense text checks
-textora-engine extract --file videos.txt --profile high-quality
+# 6. Launch platform API server
+textora-engine serve --host 127.0.0.1 --port 8000 --output ./my_dataset
 ```
 
 ---
 
-## Complete CLI Options Reference
+## REST API
 
-```text
-Usage: textora-engine extract [OPTIONS] [INPUTS]...
+Textora Engine includes a production-grade FastAPI application (`/v1/...`) with request ID tracing, security middleware, and structured error schemas.
 
-Arguments:
-  [INPUTS]...                     Video URLs, local file paths, or directories.
+### Starting the Server
 
-Options:
-  -f, --file PATH                 Input file with URLs or paths, one per line.
-  -p, --playlist TEXT             YouTube playlist URL to crawl and process.
-  -s, --query TEXT                Search query to discover relevant YouTube videos.
-  -c, --config PATH               Path to TOML configuration file.
-  --profile TEXT                  Configuration profile: 'fast', 'balanced', 'high-quality'.
-  -o, --output PATH               Target dataset output directory [default: ./output].
-  -l, --language TEXT             Language code filter ('auto', 'en', 'es', etc.) [default: auto].
-  --transcript-source TEXT        Acquisition strategy: 'auto', 'captions', 'stt' [default: auto].
-  --stt-backend TEXT              Speech-to-text engine backend [default: faster-whisper].
-  --stt-model TEXT                STT model size: 'tiny', 'base', 'small', 'medium' [default: base].
-  --group-by TEXT                 Directory grouping: 'none', 'source', 'language' [default: none].
-  --min-words INTEGER             Minimum word count threshold [default: 20].
-  --min-characters INTEGER        Minimum character count threshold [default: 100].
-  -w, --workers INTEGER           Worker count for processing [default: 1].
-  --dry-run                       Simulate discovery and pipeline without writing files.
-  --force                         Force reprocessing even if present in state ledger.
-  --resume / --no-resume          Skip already processed videos [default: --resume].
-  --retry-failed                  Retry previously failed items recorded in state.
-  --export-srt                    Export companion SubRip (.srt) subtitle files.
-  --export-vtt                    Export companion WebVTT (.vtt) subtitle files.
-  --export-json                   Export companion JSON files with timestamp segments.
-  --export-jsonl PATH             Stream all processed records to a single JSONL file.
-  --export-csv / --no-csv         Generate manifest.csv alongside manifest.jsonl [default: True].
-  --multimodal                    Enable multimodal video frame extraction.
-  --multimodal-provider TEXT      Video understanding provider ('local', 'null') [default: local].
-  --frame-interval FLOAT          Frame extraction interval in seconds [default: 10.0].
-  --export-multimodal-md          Export synchronized Markdown (.multimodal.md).
-  --export-multimodal-json        Export structured JSON (.multimodal.json).
-  -v, --verbose                   Enable verbose debug logging.
-  -q, --quiet                     Suppress non-error terminal output.
-  --help                          Show help message and exit.
+```bash
+textora-engine serve --host 127.0.0.1 --port 8000 --output ./output_data
 ```
 
----
+Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
 
-## Python API Usage
+### API Endpoints
 
-Textora Engine can also be used directly in Python scripts and data pipelines:
+#### System & Health
+- `GET /v1/health`: Basic liveness check.
+- `GET /v1/readiness`: Deep readiness check auditing database connection, storage access, FFmpeg availability, and queue depth.
+- `GET /v1/metrics`: Returns operational Prometheus-compatible metrics snapshots (API requests, queue depths, latencies).
 
-```python
-from pathlib import Path
-from textora_engine.config import TextoraConfig
-from textora_engine.pipeline import TextoraPipeline
-from textora_engine.discovery.detector import discover_inputs
+#### Projects
+- `POST /v1/projects`: Create a project boundary.
+- `GET /v1/projects`: List projects within the authenticated organization.
 
-# Configure pipeline settings
-config = TextoraConfig(
-    output_dir=Path("./my_dataset"),
-    language="en",
-    min_words=20,
-    export_srt=True,
-    export_json=True,
-)
+#### Jobs (Asynchronous & Idempotent)
+- `POST /v1/jobs`: Submit a video for asynchronous processing.
+  - Headers: `Idempotency-Key` *(optional)*, `X-API-Key` or `Authorization: Bearer <key>`, `X-Org-ID`.
+  - Body parameters: `source_uri`, `project_id`, `language`, `transcript_source`, `stt_model`, `multimodal`, `frame_interval_seconds`, `priority`.
+- `GET /v1/jobs/{job_id}`: Retrieve job status, stage, attempt counts, and metadata.
+- `POST /v1/jobs/{job_id}/cancel`: Request cancellation of an active or queued job.
+- `GET /v1/jobs/{job_id}/artifacts`: List verified artifacts registered to this job.
 
-# Initialize pipeline and discover inputs
-pipeline = TextoraPipeline(config)
-sources = discover_inputs([
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "./recordings/lecture_01.mp4",
-])
+#### Datasets & Versions
+- `GET /v1/datasets`: List managed datasets.
+- `GET /v1/datasets/{dataset_id}/versions`: List immutable version snapshots.
+- `POST /v1/datasets/{dataset_id}/versions`: Create an immutable version release snapshot (`v1.0.0`).
 
-# Execute batch processing
-summary = pipeline.run(sources)
-print(f"Processed: {summary.processed}, Words: {summary.total_words:,}")
+### Example Request & Response
+
+```bash
+# Submit an asynchronous video processing job
+curl -X POST http://127.0.0.1:8000/v1/jobs \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: ingest_run_001" \
+  -d '{
+    "source_uri": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "language": "en",
+    "multimodal": true,
+    "frame_interval_seconds": 10.0
+  }'
 ```
 
-### Configuration via TOML
-You can load configuration settings programmatically from a standard TOML file via `TextoraConfig.load_from_toml(path)`:
-
-```toml
-# textora.toml
-output_dir = "./curated_dataset"
-language = "en"
-transcript_source = "auto"
-stt_backend = "faster-whisper"
-stt_model = "base"
-group_by = "none"
-min_words = 30
-min_characters = 150
-workers = 1
-export_srt = true
-export_vtt = false
-export_json = true
-export_csv = true
-```
-
-Load in Python:
-```python
-config = TextoraConfig.load_from_toml(Path("textora.toml"))
-pipeline = TextoraPipeline(config)
-```
-
----
-
-## Dataset Manifest & Output Schema
-
-### Output Directory Structure
-```text
-my_dataset/
-├── transcripts/
-│   ├── dQw4w9WgXcQ.txt                 # Pure transcript text (zero headers/metadata)
-│   ├── dQw4w9WgXcQ.srt                 # Optional (--export-srt)
-│   ├── dQw4w9WgXcQ.vtt                 # Optional (--export-vtt)
-│   ├── dQw4w9WgXcQ.json                # Optional (--export-json)
-│   └── lecture_01.txt
-├── .state/
-│   ├── processed.json                  # Ledger of successfully indexed items
-│   └── failed.json                     # Structured error log for targeted retries
-├── manifest.jsonl                      # Append-only structured JSONL audit trail
-├── manifest.csv                        # Tabular manifest spreadsheet
-└── stats.json                          # Aggregate execution statistics
-```
-
-### Pure `.txt` Output Structure
-Every `.txt` written to `transcripts/` contains **strictly spoken text**:
-```text
-We're no strangers to love. You know the rules and so do I. A full commitment's
-what I'm thinking of. You wouldn't get this from any other guy. I just wanna tell
-you how I'm feeling, gotta make you understand. Never gonna give you up...
-```
-*(No markdown frontmatter, no headers, no metadata comments, no timestamps.)*
-
-### `manifest.jsonl` Schema
-Each record in `manifest.jsonl` documents provenance, audio parameters, and content hashes:
-
+Response (`202 Accepted`):
 ```json
 {
-  "source_id": "dQw4w9WgXcQ",
-  "source_type": "YOUTUBE",
-  "uri": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  "title": "dQw4w9WgXcQ",
-  "output_path": "transcripts/dQw4w9WgXcQ.txt",
-  "transcript_source": "YOUTUBE_MANUAL",
-  "stt_backend": null,
-  "stt_model": null,
-  "language": "en",
-  "quality_status": "GOOD",
-  "word_count": 423,
-  "character_count": 2058,
-  "duration_seconds": 213.0,
-  "transcript_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "normalized_hash": "f45a7b8c...",
-  "confidence": 1.0,
-  "processed_at": "2026-09-09T14:30:00+00:00",
-  "status": "SUCCESS",
-  "notes": null
+  "job": {
+    "id": "job_3f4e2a1b9c0d",
+    "org_id": "default_org",
+    "project_id": "default_project",
+    "source_uri": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "state": "QUEUED",
+    "priority": 0,
+    "created_at": "2026-09-10T12:00:00Z"
+  },
+  "is_new": true,
+  "message": "Job enqueued for processing"
 }
 ```
 
 ---
 
+## Python SDK
+
+Textora Engine provides a lightweight, zero-dependency Python client (`TextoraClient`) built entirely on standard library primitives (`urllib.request`).
+
+```python
+from textora_engine.sdk import TextoraClient, TextoraAPIError
+
+# Initialize client
+client = TextoraClient(base_url="http://127.0.0.1:8000", api_key="tx_live_...")
+
+try:
+    # 1. Verify service readiness
+    ready_status = client.readiness()
+    print("Cluster Status:", ready_status["status"])
+
+    # 2. Submit an idempotent video processing job
+    submission = client.jobs.create(
+        source_uri="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        language="en",
+        multimodal=True,
+        frame_interval_seconds=15.0,
+        idempotency_key="batch_item_101",
+    )
+    job_id = submission["job"]["id"]
+    print(f"Submitted Job ID: {job_id} (Is New: {submission['is_new']})")
+
+    # 3. Poll job status
+    job_info = client.jobs.get(job_id)
+    print(f"Current State: {job_info['state']}")
+
+    # 4. List produced artifacts once completed
+    if job_info["state"] == "COMPLETED":
+        artifacts = client.jobs.list_artifacts(job_id)
+        for art in artifacts:
+            print(f"Artifact: {art['artifact_type']} -> {art['storage_path']}")
+
+except TextoraAPIError as e:
+    print(f"API Error [{e.status_code}] ({e.error_code}): {e.message}")
+    print(f"Request ID: {e.request_id}")
+```
+
+---
+
+## Data Outputs & Artifact Structure
+
+Textora Engine organizes generated datasets with strict physical layout rules:
+
+```text
+my_dataset/
+├── transcripts/
+│   ├── dQw4w9WgXcQ.txt                 # The Pure Plain Text Transcript (Strict spoken text)
+│   ├── dQw4w9WgXcQ.srt                 # Optional: SubRip subtitle format
+│   ├── dQw4w9WgXcQ.vtt                 # Optional: WebVTT subtitle format
+│   ├── dQw4w9WgXcQ.json                # Optional: Segment timestamp JSON
+│   ├── dQw4w9WgXcQ.multimodal.md       # Optional: Markdown with embedded frame citations
+│   └── dQw4w9WgXcQ.multimodal.json     # Optional: Machine-readable multimodal schema
+├── frames/
+│   └── dQw4w9WgXcQ/
+│       ├── frame_0001.jpg              # Sampled video frame (timestamp: 0.0s)
+│       └── frame_0002.jpg              # Sampled video frame (timestamp: 10.0s)
+├── _manifests/
+│   └── exec_a1b2c3d4e5f6.json          # Immutable execution manifest with config hash
+├── versions/
+│   └── v1.0.0/
+│       ├── manifest.json               # Frozen snapshot manifest
+│       └── version_meta.json           # Release metadata and word counts
+├── .state/
+│   ├── processed.json                  # State ledger of completed items for resume
+│   └── failed.json                     # Structured error log for targeted retry
+├── manifest.json                       # Canonical dataset manifest array
+├── manifest.csv                        # Spreadsheet-ready CSV export
+└── stats.json                          # Aggregate execution summary metrics
+```
+
+### The Pure `.txt` Invariant
+Output `.txt` files contain **strictly spoken prose**. They have zero markdown headers, zero timestamp annotations, zero speaker prefix brackets, and zero metadata footers.
+
+*Example `transcripts/lecture_01.txt`:*
+```text
+We begin our discussion of distributed systems by examining the consensus problem.
+When multiple nodes communicate over an unreliable network, achieving agreement on a
+single shared state requires fault-tolerant consensus protocols such as Raft or Paxos...
+```
+
+---
+
+## Multimodal Video Understanding
+
+Modern technical videos contain essential knowledge in visual frames that text-only transcriptions lose. Textora Engine provides a provider-independent architecture for multimodal frame extraction and temporal alignment.
+
+### Temporal Alignment
+The engine aligns visual frames to transcript segments by timestamp containment or nearest temporal boundary:
+
+```
+[00:10.000 ──► 00:25.000]
+"In this diagram, the client communicates directly with the durable queue."
+     │
+     └── Associated Visual Frame: frames/arch_demo/frame_0002.jpg (Timestamp: 00:15.000)
+```
+
+### Honest Semantics Guarantee
+The built-in `LocalVideoUnderstandingProvider` extracts frames at deterministic intervals using FFmpeg.
+- **What it reports**: Accurate timestamps, frame dimensions, file paths, and type `sampled_frame`.
+- **What it never does**: It **never** fabricates fake OCR text, semantic categories (`code_screen`, `slide`), or artificial confidence scores.
+- **Extensibility**: Advanced semantic vision models or external visual LLMs can be integrated by implementing `BaseVideoUnderstandingProvider`.
+
+---
+
+## RAG & AI Agent Readiness
+
+Traditional RAG chunking across raw transcript text loses temporal context and visual evidence. Textora Engine’s `TextoraChunker` generates structured `RetrievalChunk` objects:
+
+```json
+{
+  "chunk_id": "chk_8a1f9c2d0e",
+  "source_id": "lecture_01",
+  "dataset_version": "v1.0.0",
+  "start_timestamp": 120.5,
+  "end_timestamp": 165.2,
+  "duration": 44.7,
+  "text": "The durable queue utilizes SQLite write-ahead logging to guarantee zero-loss commits...",
+  "associated_frame_paths": [
+    "frames/lecture_01/frame_0012.jpg"
+  ],
+  "artifact_ref": "transcripts/lecture_01.txt",
+  "provenance_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
+```
+
+This structure enables AI retrieval systems to return not just text, but exact video playback timestamps and corresponding visual slides or code screenshots.
+
+---
+
+## Data Integrity & Reproducibility
+
+1. **4-State Artifact Lifecycle**: Files transition strictly through `CREATING` $\rightarrow$ `READY` $\rightarrow$ `FAILED` / `DELETED`.
+2. **Isolated Staging**: Artifacts are written into `_staging/<job_id>_<attempt_id>` and flushed to disk with `os.fsync`.
+3. **Atomic Promotion**: Validated files are promoted to their permanent path via `os.replace`. Partial or zero-byte files are rejected before promotion.
+4. **Execution Manifests**: Every job writes an immutable manifest recording execution ID, source URI, config hash, pipeline version, stage timings, and artifact SHA-256 hashes.
+5. **Non-Destructive Repair**: The `textora-engine repair` command audits disk contents against `manifest.json`. It indexes unindexed files and recalculates missing checksums **without ever altering or deleting original transcript text**.
+
+---
+
+## Reliability & Concurrency
+
+- **Worker Heartbeat Leasing**: Background workers acquire jobs with a time-bounded lease. Active workers periodically send heartbeats. If a worker process terminates unexpectedly, `recover_expired_leases` automatically resets the job state for re-processing.
+- **Classified Error Taxonomy**:
+  - `TRANSIENT`: Rate limits, network drops, and storage lock timeouts automatically retry with exponential backoff and jitter.
+  - `PERMANENT`: Linguistic mismatches, quality check failures, and invalid media stop processing immediately to avoid wasted compute.
+  - `FATAL`: Missing dependencies or invalid configuration halt processing safely.
+- **Resource Limiter**: Enforces strict semaphore bounds on concurrent FFmpeg and STT tasks, and verifies that the target filesystem has sufficient free disk space before initiating downloads.
+
+---
+
+## Security & Threat Model
+
+Textora Engine is engineered to safely process untrusted user inputs:
+
+- **SSRF Defense**: `URLValidator` inspects target URLs, resolving hostnames and validating every redirect hop against private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`), IPv6 link-local (`fe80::/10`), cloud metadata IP (`169.254.169.254`), and blacklisted sensitive ports (e.g. 22, 6379). Embedded credentials (`http://user:pass@host`) are explicitly rejected.
+- **Sandboxed Subprocess Execution**: `SubprocessRunner` runs media extraction with `shell=False`, strict argument arrays, hard execution timeouts, and complete process-tree termination.
+- **Filesystem Traversal Prevention**: `PathSanitizer` neutralizes `../` traversal, UNC paths, and Windows device names (`CON`, `PRN`, `AUX`, `NUL`).
+- **Multi-Tenant Isolation**: Database queries enforce organization boundaries. Negative test suites confirm that cross-tenant access attempts return HTTP 403 `PERMISSION_DENIED`.
+
+---
+
+## Observability & Metrics
+
+- **Correlation Tracing**: Every log entry includes structured fields: `timestamp`, `level`, `request_id`, `job_id`, `attempt_id`, `worker_id`, and `org_id`.
+- **Sensitive Data Redaction**: Automatic log filters redact API keys, bearer tokens, passwords, and sensitive URL query parameters.
+- **In-Memory Metrics Registry**: Records request counters, queue depth gauges, and duration timers exposed via `GET /v1/metrics`.
+
+---
+
 ## Testing & Verification
 
-The codebase includes comprehensive unit tests and a 13-scenario real-world end-to-end suite:
+Textora Engine is verified through rigorous automated test suites and real-world execution scenarios:
 
-### 1. Run the Automated Unit Tests
 ```bash
+# Run the complete automated test suite
 python -m pytest tests -v
-```
 
-**Results**:
-```text
-============================= test session starts =============================
-platform win32 -- Python 3.12.5, pytest-8.3.5
-rootdir: textora-engine
-
-tests/test_cli.py::test_cli_help PASSED                                  [  2%]
-tests/test_cli.py::test_cli_preview_youtube PASSED                       [  5%]
-tests/test_cli.py::test_cli_extract_dry_run PASSED                       [  8%]
-tests/test_cli.py::test_cli_validate_and_stats PASSED                    [ 11%]
-tests/test_cli.py::test_cli_doctor PASSED                                [ 14%]
-tests/test_coordinator_stt.py::test_find_and_parse_sibling_subtitle PASSED [ 17%]
-tests/test_coordinator_stt.py::test_coordinator_prefers_sibling_subtitles_for_local_video PASSED [ 20%]
-tests/test_coordinator_stt.py::test_pipeline_end_to_end_with_mock_stt PASSED [ 23%]
-tests/test_dedup.py::test_hashing PASSED                                 [ 26%]
-tests/test_dedup.py::test_dedup_registry_source_tracking PASSED          [ 29%]
-tests/test_dedup.py::test_dedup_registry_topic_preservation PASSED       [ 32%]
-tests/test_dedup.py::test_dedup_registry_content_duplicate_warning PASSED [ 35%]
-tests/test_discovery.py::test_extract_youtube_video_id PASSED            [ 38%]
-tests/test_discovery.py::test_extract_youtube_playlist_id PASSED         [ 41%]
-tests/test_discovery.py::test_local_video_discovery PASSED               [ 44%]
-tests/test_discovery.py::test_batch_file_discovery PASSED                [ 47%]
-tests/test_discovery.py::test_invalid_input_discovery PASSED             [ 50%]
-tests/test_language.py::test_auto_language_accepts_any_valid_language PASSED [ 52%]
-tests/test_language.py::test_english_validation_accepts_clean_english PASSED [ 55%]
-tests/test_language.py::test_english_validation_rejects_non_latin_scripts PASSED [ 58%]
-tests/test_language.py::test_english_validation_rejects_transliterated_hinglish PASSED [ 61%]
-tests/test_language.py::test_scientific_vocabulary_is_not_falsely_penalized PASSED [ 64%]
-tests/test_normalization.py::test_unescape_entities PASSED               [ 67%]
-tests/test_normalization.py::test_remove_audio_annotations PASSED        [ 70%]
-tests/test_normalization.py::test_deduplicate_caption_flickers PASSED    [ 73%]
-tests/test_normalization.py::test_normalize_text_preserves_faithful_content PASSED [ 76%]
-tests/test_quality.py::test_quality_empty_transcript PASSED              [ 79%]
-tests/test_quality.py::test_quality_short_transcript PASSED              [ 82%]
-tests/test_quality.py::test_quality_looping_captions_flagged_suspicious PASSED [ 85%]
-tests/test_quality.py::test_quality_clean_transcript_good PASSED         [ 88%]
-tests/test_storage_state.py::test_pure_txt_transcript_has_no_headers PASSED [ 91%]
-tests/test_storage_state.py::test_companion_formats_srt_and_vtt PASSED   [ 94%]
-tests/test_storage_state.py::test_manifest_manager PASSED                [ 97%]
-tests/test_storage_state.py::test_state_manager_resume_and_file_verification PASSED [100%]
-
-============================= 34 passed in 9.51s ==============================
-```
-
-### 2. Run the Real-World E2E Test Suite
-The repository includes an end-to-end verification script executing 13 real-world scenarios:
-
-```bash
+# Run the 14-scenario real-world end-to-end suite
 python tests/test_e2e_real_world.py
 ```
 
-Scenarios validated:
-1. **Real YouTube Video**: Fetches live YouTube transcript, normalizes text, verifies zero headers in `.txt`.
-2. **Duplicate YouTube Video**: Confirms instantaneous `[SKIP]` with zero file modifications.
-3. **YouTube Playlist**: Crawls public playlist into stable work queue with batch isolation.
-4. **Local Video with Captions**: Detects sibling `.srt`, extracts text, and confirms STT bypass.
-5. **Local Video without Captions**: Routes to local STT provider path, logs media failures gracefully.
-6. **Language Boundaries**: Verifies English acceptance, Hindi rejection, Hinglish rejection, and scientific terminology preservation.
-7. **Quality Tiers**: Validates `EMPTY`, `SHORT`, `SUSPICIOUS`, and `GOOD` classifications.
-8. **Crash-Safe Resume**: Simulates an interrupted batch and confirms clean resumption.
-9. **Failure Isolation**: Validates mixed batches where invalid inputs fail cleanly without halting valid items.
-10. **Strict Plain-Text Fidelity**: Audits generated `.txt` files for valid UTF-8, absence of prose, and zero secrets.
-11. **Dataset Scanner & Audit**: Runs `textora-engine validate` to verify checksum disk integrity.
-12. **Dataset Statistics**: Runs `textora-engine stats` to confirm word/character count parity.
-13. **Doctor Diagnostics**: Verifies environment audit table rendering.
+### Verified Test Summary
+
+```
+============================= 97 passed in 47.51s =============================
+```
+
+- **Domain & State Machine**: State transition validation, lifecycle enforcement, entity serialization.
+- **Database & Transactions**: SQLite WAL migrations, multi-statement rollback under simulated errors.
+- **Concurrency & Races**: 10 concurrent threads submitting identical idempotency keys (1 created, 9 deduplicated); 8 concurrent workers claiming a single job (exactly 1 claim).
+- **Security & SSRF**: Private IP ranges, cloud metadata endpoints, redirect validation, subprocess isolation, API key verification, RBAC permissions.
+- **Storage & Path Security**: Directory traversal defense, Windows reserved names, atomic staging, and promotion.
+- **Dataset Versioning & Repair**: Manifest snapshot immutability, non-destructive repair of corrupt metadata.
+- **Full-Chain Platform Integration**: End-to-end execution from API submission $\rightarrow$ Queue $\rightarrow$ Worker $\rightarrow$ Pipeline $\rightarrow$ Artifacts $\rightarrow$ Lineage $\rightarrow$ Versioning $\rightarrow$ Repair $\rightarrow$ RAG Chunker.
+- **14/14 Real-World E2E Scenarios**: Live YouTube extraction, playlist queues, sibling subtitle ingestion, STT fallback, linguistic boundaries, quality thresholds, crash resume, and multimodal alignment.
 
 ---
 
-## Limitations & Operational Notes
+## Project Structure
 
-- **YouTube Rate Limits**: Large-scale YouTube caption extraction is subject to YouTube's public IP rate limits. When crawling large playlists, using `--workers 1` with default request delays is recommended.
-- **FFmpeg Requirement for Local STT**: Transcribing audio from local video containers (`.mp4`, `.mkv`, `.webm`) requires FFmpeg. If FFmpeg is not detected on your system `PATH`, install `imageio-ffmpeg` via `pip install imageio-ffmpeg` or `pip install -e ".[stt]"`.
-- **First-Run STT Model Downloads**: When `faster-whisper` is first invoked, it downloads the specified model weights (e.g., `base`, `small`) from Hugging Face into your local cache directory.
+```text
+src/textora_engine/
+├── api/                      # FastAPI REST application, endpoints, and error schemas
+├── cli.py                    # Typer & Rich CLI subcommands (11 commands)
+├── config.py                 # TextoraConfig, profile definitions, and TOML parser
+├── dataset/                  # Immutable dataset versioning and non-destructive repair
+├── db/                       # SQLite WAL database connection, migrations, and repositories
+├── dedup/                    # xxHash64 fingerprinting and content deduplication
+├── diarization/              # Speaker diarization interfaces and data models
+├── discovery/                # YouTube canonicalization, playlists, and file detection
+├── domain/                   # Pure domain entities, enums, and state machines
+├── exceptions.py             # Classified exception hierarchy
+├── jobs/                     # Durable queue, worker pool, idempotency, retry, and limiter
+├── language/                 # Script validation, Hinglish vocabulary filter, langdetect
+├── lineage/                  # Execution manifests and immutable lineage DAG tracker
+├── media/                    # FFmpeg audio conversion and media utilities
+├── models.py                 # Core transcript and segment dataclasses
+├── normalization/            # Deterministic caption de-flickering and tag removal
+├── observability/            # Structured JSON logging and metrics registry
+├── pipeline.py               # Core batch processing pipeline orchestrator
+├── quality/                  # N-gram repetition loops and transcript quality evaluation
+├── reporting/                # Terminal tables, summary statistics, and HTML dashboard
+├── retrieval/                # RAG retrieval chunker with temporal and visual provenance
+├── sdk/                      # Lightweight zero-dependency Python client SDK
+├── security/                 # SSRF validator, subprocess runner, path sanitizer, and auth
+├── state/                    # Checkpointing and resume ledger (.state/)
+├── storage/                  # ArtifactManager, StorageBackend, manifest and writer
+├── stt/                      # Speech-to-Text provider registry and faster-whisper backend
+├── transcripts/              # Caption-first coordinator and subtitle parsers
+├── validation/               # Offline dataset scanner and hash auditor
+└── video_understanding/      # Multimodal frame extraction and temporal alignment
+```
 
 ---
 
-## Roadmap & Planned Improvements
+## Deployment Options
 
-*(These items represent planned future enhancements and are not part of the current v0.1 release.)*
+### Tier 1: Standalone CLI
+Ideal for single machines, researchers, and local data collection:
+```bash
+textora-engine extract ./my_video.mp4 --output ./dataset
+```
 
-- [ ] **Proxy & Header Rotation**: Configurable HTTP/SOCKS5 proxy rotation for large-scale YouTube collection.
-- [ ] **Speaker Diarization**: Multi-speaker segment labeling integration (e.g., PyAnnote) for interview transcriptions.
-- [ ] **Word-Level Alignment**: WhisperX-compatible phoneme alignment for timestamp synchronization.
-- [ ] **Cloud Storage Targets**: Direct streaming of output datasets to AWS S3, Google Cloud Storage, or Hugging Face Hub.
-- [ ] **Live Audio Streams**: RTMP and HLS streaming audio ingestion.
+### Tier 2: Single-Node Platform Server
+Runs the REST API server and local background worker over an embedded SQLite WAL database:
+```bash
+textora-engine serve --host 0.0.0.0 --port 8000 --output /data/textora
+```
+
+### Tier 3: Docker & Docker Compose
+A multi-stage containerized deployment with non-root security (`textora:10001`), pre-installed FFmpeg, and persistent data volumes:
+
+```bash
+docker compose up -d
+```
+
+*`docker-compose.yml` snippet:*
+```yaml
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - TEXTORA_OUTPUT_DIR=/app/output
+      - TEXTORA_LOG_LEVEL=INFO
+    volumes:
+      - textora-data:/app/output
+```
+
+---
+
+## Operational Limitations
+
+To maintain strict technical honesty, the following system boundaries are documented:
+
+1. **SQLite Concurrency Boundary**: SQLite WAL mode provides high read concurrency and safe multi-threaded writes via table serialization. Workloads exceeding 100 concurrent write operations per second should utilize PostgreSQL via the storage abstraction.
+2. **Local Frame Sampling vs. Semantic Vision**: The built-in local video understanding provider performs interval-based visual frame extraction. It does not perform OCR or semantic slide classification locally. Semantic labeling requires configuring an external vision provider.
+3. **YouTube Rate Limits**: Bulk YouTube caption extraction is subject to public IP throttling by YouTube. For large collections, use appropriate batch delays and worker bounds.
+4. **FFmpeg System Dependency**: Media extraction and frame sampling require FFmpeg on the system `PATH`. When absent, the engine gracefully reports the limitation via `textora-engine doctor`.
+
+---
+
+## Strategic Roadmap
+
+*(Future evolution points designed to build upon the current architecture)*
+
+```
+TODAY: Textora Engine (Core Processing + Dataset Engineering)
+  │
+  ├──► NEAR-TERM: Platform Expansion
+  │      • PostgreSQL storage and metadata driver
+  │      • S3 / MinIO / GCS object storage backend
+  │      • Distributed Redis / Celery / RabbitMQ queue integration
+  │
+  ├──► MEDIUM-TERM: Rich Multimodal Intelligence
+  │      • Optical Character Recognition (OCR) provider integration
+  │      • Automated slide and code screen classifier
+  │      • Multi-speaker diarization integration (PyAnnote)
+  │
+  └──► LONG-TERM: Multimodal AI Data Infrastructure
+         • Multi-worker distributed clusters
+         • Enterprise web audit dashboard
+         • Streaming audio/video ingestion (HLS, RTMP)
+         • Vector database sync (Milvus, Qdrant, Pinecone)
+```
+
+---
+
+## Contributing
+
+Contributions to Textora Engine are welcome!
+
+1. Fork the repository and create a feature branch (`git checkout -b feature/my-feature`).
+2. Install development dependencies:
+   ```bash
+   pip install -e ".[server,dev,stt]"
+   ```
+3. Run the automated test suite before opening a pull request:
+   ```bash
+   python -m pytest tests -v
+   python tests/test_e2e_real_world.py
+   ```
+4. Adhere to the established architectural boundaries (pure core engine, sandboxed subprocesses, honest multimodal semantics, and the pure `.txt` invariant).
 
 ---
 
 ## License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete terms.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
 ```text
 Copyright (c) 2026 Pranay Kumar
 ```
+
+---
+
+## Acknowledgements
+
+Textora Engine is built upon exceptional open-source software:
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper): Highly optimized Whisper inference using CTranslate2.
+- [FFmpeg](https://ffmpeg.org): Industry-standard multimedia processing framework.
+- [FastAPI](https://fastapi.tiangolo.com): Modern, high-performance web framework for Python APIs.
+- [Typer](https://typer.tiangolo.com) & [Rich](https://github.com/Textualize/rich): Beautiful, type-safe terminal CLI engineering.
+- [xxHash](https://github.com/Cyan4973/xxHash): Extremely fast non-cryptographic hash algorithm.
+- [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api): Resilient YouTube caption extraction.

@@ -51,7 +51,7 @@ class SQLiteDatabase(DatabaseBackend):
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
         # Initialize WAL mode on database file
-        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn = sqlite3.connect(str(self.db_path), timeout=10.0, isolation_level=None)
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
         conn.execute("PRAGMA foreign_keys=ON;")
@@ -60,7 +60,7 @@ class SQLiteDatabase(DatabaseBackend):
 
     def _get_connection(self) -> sqlite3.Connection:
         if not hasattr(self._local, "conn") or self._local.conn is None:
-            conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+            conn = sqlite3.connect(str(self.db_path), timeout=10.0, isolation_level=None)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys=ON;")
             conn.execute("PRAGMA busy_timeout=10000;")

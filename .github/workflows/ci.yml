@@ -34,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .[server,dev,stt]
+        pip install -e ".[server,dev,stt]"
 
     - name: Run Unit and Platform Test Suite
       run: |

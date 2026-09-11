@@ -41,6 +41,8 @@ venv.bak/
 .state/
 *.state
 checkpoint.json
+*.db
+uv.lock
 
 # Model files / weights (Whisper / faster-whisper / Hugging Face)
 models/

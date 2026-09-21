@@ -1,4 +1,4 @@
-# Textora Engine v1
+# Textora Engine v2
 
 <p align="center">
   <strong>The Video-to-Text & Multimodal Dataset Engineering Platform</strong><br>
